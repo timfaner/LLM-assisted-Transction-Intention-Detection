@@ -268,35 +268,43 @@ class SemanticEntropyCalculator:
         if not cluster_ids or not log_probs or len(cluster_ids) != len(log_probs):
             return 0.0
             
-        # 筛选有效的log_probs并按聚类ID分组
+        # 筛选有效的log_probs和对应的聚类ID
         valid_data = [(cid, lp) for cid, lp in zip(cluster_ids, log_probs) 
                      if lp is not None and not math.isnan(lp) and not math.isinf(lp)]
         
         if not valid_data:
             return 0.0
             
-        # 按聚类ID收集对数概率
+        # 1. 提取有效的对数概率
+        valid_log_probs = [lp for _, lp in valid_data]
+        
+        # 2. 计算归一化因子（所有对数概率的logsumexp）
+        total_log_prob = self.logsumexp(valid_log_probs)
+        
+        # 3. 按聚类ID分组，同时对对数概率进行归一化
         cluster_log_probs = defaultdict(list)
         for cluster_id, log_prob in valid_data:
-            cluster_log_probs[cluster_id].append(log_prob)
+            # 先进行归一化，再分组
+            normalized_log_prob = log_prob - total_log_prob
+            cluster_log_probs[cluster_id].append(normalized_log_prob)
         
-        # 对每个聚类使用logsumexp聚合对数概率
-        aggregated_log_probs = []
+        # 4. 对每个聚类组内的归一化对数概率进行logsumexp聚合
+        log_likelihood_per_semantic_id = []
         for log_probs_list in cluster_log_probs.values():
             if log_probs_list:
-                aggregated_log_probs.append(self.logsumexp(log_probs_list))
+                log_likelihood_per_semantic_id.append(self.logsumexp(log_probs_list))
         
-        # 对聚合后的对数概率进行归一化
-        if aggregated_log_probs:
-            # 使用logsumexp进行log空间的归一化
-            total_log_prob = self.logsumexp(aggregated_log_probs)
-            normalized_log_probs = [lp - total_log_prob for lp in aggregated_log_probs]
-            
-            # 使用Rao方法计算预测熵: -sum(exp(log_p) * log_p)
-            entropy = -sum(math.exp(log_p) * log_p for log_p in normalized_log_probs)
-            return entropy
+        # 5. 使用Rao方法计算熵: -sum(exp(log_p) * log_p)
+        entropy = -sum(math.exp(log_p) * log_p for log_p in log_likelihood_per_semantic_id)
         
-        return 0.0
+        # 记录调试信息
+        logging.debug(f"聚类ID: {cluster_ids}")
+        logging.debug(f"原始对数概率: {log_probs}")
+        logging.debug(f"归一化后的对数概率: {[lp - total_log_prob for _, lp in valid_data]}")
+        logging.debug(f"每个语义ID的聚合对数概率: {log_likelihood_per_semantic_id}")
+        logging.debug(f"计算得到的语义熵: {entropy}")
+        
+        return entropy
     
     def calculate_question_entropy(self, question_data: Dict) -> float:
         """
@@ -321,19 +329,29 @@ class SemanticEntropyCalculator:
                 log_probs.append(logprob)
         
         if not answers or not log_probs:
+            logging.warning(f"问题 '{question_data.get('question', '未知问题')}' 没有有效的答案或对数概率")
             return 0.0
         
         # 对答案进行语义聚类
         cluster_ids = self.get_semantic_ids(answers)
         
+        # 检查聚类结果
+        if len(set(cluster_ids)) == 1:
+            logging.warning(f"问题 '{question_data.get('question', '未知问题')}' 的所有答案被聚类到同一组: {cluster_ids}")
+        
+        # 检查对数概率是否相同
+        if len(set(log_probs)) == 1:
+            logging.warning(f"问题 '{question_data.get('question', '未知问题')}' 的所有答案对数概率相同: {log_probs[0]}")
+        
         # 使用修改后的方法计算语义熵
         entropy = self.calculate_cluster_entropy(cluster_ids, log_probs)
         
-        # 记录调试信息
+        # 记录详细的调试信息
         logging.debug(f"问题: {question_data.get('question', '未知问题')}")
         logging.debug(f"答案数量: {len(answers)}")
-        logging.debug(f"聚类结果: {cluster_ids}")
+        logging.debug(f"答案文本: {answers}")
         logging.debug(f"对数概率: {log_probs}")
+        logging.debug(f"聚类结果: {cluster_ids}")
         logging.debug(f"计算得到的语义熵: {entropy}")
         
         return entropy

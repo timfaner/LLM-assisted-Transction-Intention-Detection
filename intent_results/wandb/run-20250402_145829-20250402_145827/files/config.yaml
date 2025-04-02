@@ -1,0 +1,55 @@
+_wandb:
+    value:
+        cli_version: 0.19.8
+        m: []
+        python_version: 3.12.9
+        t:
+            "1":
+                - 1
+                - 55
+            "2":
+                - 1
+                - 55
+                - 95
+            "3":
+                - 3
+                - 14
+                - 16
+                - 23
+                - 55
+            "4": 3.12.9
+            "5": 0.19.8
+            "8":
+                - 5
+            "12": 0.19.8
+            "13": linux-x86_64
+api_key:
+    value: null
+debug:
+    value: false
+device:
+    value: cpu
+embedding_model:
+    value: text-embedding-ada-002
+http_proxy:
+    value: null
+https_proxy:
+    value: null
+input_dir:
+    value: contracts_to_analyze
+local_model_path:
+    value: null
+max_contracts:
+    value: 0
+model_name:
+    value: gpt-3.5-turbo
+model_type:
+    value: api
+num_tests:
+    value: 1
+save_interval:
+    value: 10
+use_local:
+    value: false
+wandb_dir:
+    value: null

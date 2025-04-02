@@ -1,0 +1,37 @@
+{
+  "os": "Linux-6.8.0-52-generic-x86_64-with-glibc2.35",
+  "python": "CPython 3.12.9",
+  "startedAt": "2025-04-02T06:58:29.724554Z",
+  "args": [
+    "--input_dir",
+    "contracts_to_analyze",
+    "--model_name",
+    "gpt-3.5-turbo",
+    "--num_tests",
+    "1"
+  ],
+  "program": "-m sc_analyzer.main",
+  "git": {
+    "remote": "https://github.com/Hosen-oos/LLM-assisted-Transction-Intention-Detection.git",
+    "commit": "8617f52a7d108b2ed6e79c2ea6743d12649cc3eb"
+  },
+  "email": "S230130@e.ntu.edu.sg",
+  "root": "/home/hosen/LLM assisted smart contract intent detection/intent_results",
+  "host": "Hosen",
+  "executable": "/home/hosen/miniconda3/bin/python",
+  "cpu_count": 8,
+  "cpu_count_logical": 12,
+  "disk": {
+    "/": {
+      "total": "139002019840",
+      "used": "82604945408"
+    }
+  },
+  "memory": {
+    "total": "16479719424"
+  },
+  "cpu": {
+    "count": 8,
+    "countLogical": 12
+  }
+}

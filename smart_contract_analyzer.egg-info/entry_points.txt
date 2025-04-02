@@ -1,0 +1,2 @@
+[console_scripts]
+entropy-analyzer = semantic_entropy_analyzer.runner:main

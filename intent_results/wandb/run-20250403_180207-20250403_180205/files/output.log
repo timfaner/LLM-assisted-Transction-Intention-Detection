@@ -1,0 +1,16 @@
+2025-04-03 18:02:08 INFO     新运行开始，配置如下:
+2025-04-03 18:02:08 INFO     Namespace(input_dir='contracts_to_analyze', wandb_dir=None, max_contracts=0, save_interval=10, num_tests=1, step='step2', input_results='/home/hosen/LLM-assisted-Transction-Intention-Detection/intent_results/wandb/run-20250403_180030-20250403_180029/files/results.pkl', model_type='api', model_name='gpt-3.5-turbo', embedding_model='text-embedding-ada-002', api_key=None, use_local=False, local_model_path=None, device='cpu', http_proxy=None, https_proxy=None, debug=False)
+2025-04-03 18:02:08 INFO     Wandb设置完成。
+2025-04-03 18:02:08 INFO     使用API模型：通过openai API使用gpt-3.5-turbo，嵌入模型：text-embedding-ada-002
+2025-04-03 18:02:08 INFO     使用代理配置：HTTP:http://127.0.0.1:38555, HTTPS:http://127.0.0.1:38555
+2025-04-03 18:02:08 INFO     API客户端初始化成功
+2025-04-03 18:02:08 INFO     成功从 /home/hosen/LLM-assisted-Transction-Intention-Detection/intent_results/wandb/run-20250403_180030-20250403_180029/files/results.pkl 加载结果
+2025-04-03 18:02:10 INFO     HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2025-04-03 18:02:11 INFO     HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2025-04-03 18:02:13 INFO     HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2025-04-03 18:02:14 INFO     HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2025-04-03 18:02:14 INFO     结果已保存到本地: /home/hosen/LLM-assisted-Transction-Intention-Detection/intent_results/wandb/run-20250403_180207-20250403_180205/files/results.pkl
+[34m[1mwandb[0m: [33mWARNING[0m Saving files without folders. If you want to preserve subdirectories pass base_path to wandb.save, i.e. wandb.save("/mnt/folder/file.h5", base_path="/mnt")
+2025-04-03 18:02:14 INFO     结果已同步到wandb
+2025-04-03 18:02:14 INFO     已完成 1 个合约的分析
+2025-04-03 18:02:14 INFO     结果已保存到 /home/hosen/LLM-assisted-Transction-Intention-Detection/intent_results/wandb/run-20250403_180207-20250403_180205/files/results.pkl

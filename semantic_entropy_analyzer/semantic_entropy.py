@@ -236,24 +236,6 @@ class SemanticEntropyCalculator:
         entropy = -sum(p * math.log2(p) for p in normalized_probs if p > 0)
         return entropy
     
-    def logsumexp(self, log_probs: List[float]) -> float:
-        """
-        计算log(sum(exp(x)))，以数值稳定的方式。
-        
-        参数:
-            log_probs: 对数概率列表
-            
-        返回:
-            log(sum(exp(x)))的值
-        """
-        if not log_probs:
-            return float('-inf')
-            
-        max_log_prob = max(log_probs)
-        sum_exp = sum(math.exp(lp - max_log_prob) for lp in log_probs)
-        
-        return max_log_prob + math.log(sum_exp)
-    
     def calculate_cluster_entropy(self, cluster_ids: List[int], log_probs: List[float]) -> float:
         """
         根据聚类ID和对数概率计算语义熵（使用Rao方法）。
@@ -275,32 +257,45 @@ class SemanticEntropyCalculator:
         if not valid_data:
             return 0.0
             
-        # 1. 提取有效的对数概率
+        # 提取有效的聚类ID和对数概率
+        valid_cluster_ids = [cid for cid, _ in valid_data]
         valid_log_probs = [lp for _, lp in valid_data]
         
-        # 2. 计算归一化因子（所有对数概率的logsumexp）
-        total_log_prob = self.logsumexp(valid_log_probs)
+        # 获取唯一的聚类ID并按顺序排序
+        unique_ids = sorted(list(set(valid_cluster_ids)))
+        if unique_ids != list(range(len(unique_ids))):
+            logging.warning("聚类ID不连续，将重新映射")
+            # 重新映射聚类ID为连续的整数
+            id_mapping = {old_id: new_id for new_id, old_id in enumerate(unique_ids)}
+            valid_cluster_ids = [id_mapping[cid] for cid in valid_cluster_ids]
+            unique_ids = list(range(len(unique_ids)))
         
-        # 3. 按聚类ID分组，同时对对数概率进行归一化
-        cluster_log_probs = defaultdict(list)
-        for cluster_id, log_prob in valid_data:
-            # 先进行归一化，再分组
-            normalized_log_prob = log_prob - total_log_prob
-            cluster_log_probs[cluster_id].append(normalized_log_prob)
-        
-        # 4. 对每个聚类组内的归一化对数概率进行logsumexp聚合
+        # 计算每个语义ID的logsumexp
         log_likelihood_per_semantic_id = []
-        for log_probs_list in cluster_log_probs.values():
-            if log_probs_list:
-                log_likelihood_per_semantic_id.append(self.logsumexp(log_probs_list))
+        for uid in unique_ids:
+            # 找到属于当前uid的所有位置
+            id_indices = [pos for pos, x in enumerate(valid_cluster_ids) if x == uid]
+            # 获取这些位置的对数概率
+            id_log_likelihoods = [valid_log_probs[i] for i in id_indices]
+            
+            # 计算归一化因子
+            total_log_prob = math.log(sum(math.exp(lp) for lp in valid_log_probs))
+            
+            # 归一化对数概率
+            log_lik_norm = [lp - total_log_prob for lp in id_log_likelihoods]
+            
+            # 计算logsumexp
+            logsumexp_value = math.log(sum(math.exp(lp) for lp in log_lik_norm))
+            
+            log_likelihood_per_semantic_id.append(logsumexp_value)
         
-        # 5. 使用Rao方法计算熵: -sum(exp(log_p) * log_p)
+        # 使用Rao方法计算熵
         entropy = -sum(math.exp(log_p) * log_p for log_p in log_likelihood_per_semantic_id)
         
         # 记录调试信息
-        logging.debug(f"聚类ID: {cluster_ids}")
-        logging.debug(f"原始对数概率: {log_probs}")
-        logging.debug(f"归一化后的对数概率: {[lp - total_log_prob for _, lp in valid_data]}")
+        logging.debug(f"聚类ID: {valid_cluster_ids}")
+        logging.debug(f"原始对数概率: {valid_log_probs}")
+        logging.debug(f"归一化后的对数概率: {[lp - total_log_prob for lp in valid_log_probs]}")
         logging.debug(f"每个语义ID的聚合对数概率: {log_likelihood_per_semantic_id}")
         logging.debug(f"计算得到的语义熵: {entropy}")
         

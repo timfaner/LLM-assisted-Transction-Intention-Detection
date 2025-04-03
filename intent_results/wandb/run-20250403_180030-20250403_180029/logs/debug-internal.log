@@ -1,0 +1,15 @@
+{"time":"2025-04-03T18:00:30.715517852+08:00","level":"INFO","msg":"stream: starting","core version":"0.19.8","symlink path":"/home/hosen/LLM-assisted-Transction-Intention-Detection/intent_results/wandb/run-20250403_180030-20250403_180029/logs/debug-core.log"}
+{"time":"2025-04-03T18:00:30.821413751+08:00","level":"INFO","msg":"created new stream","id":"20250403_180029"}
+{"time":"2025-04-03T18:00:30.821495275+08:00","level":"INFO","msg":"stream: started","id":"20250403_180029"}
+{"time":"2025-04-03T18:00:30.821571505+08:00","level":"INFO","msg":"writer: Do: started","stream_id":"20250403_180029"}
+{"time":"2025-04-03T18:00:30.821678775+08:00","level":"INFO","msg":"sender: started","stream_id":"20250403_180029"}
+{"time":"2025-04-03T18:00:30.821702059+08:00","level":"INFO","msg":"handler: started","stream_id":"20250403_180029"}
+{"time":"2025-04-03T18:00:31.793959446+08:00","level":"INFO","msg":"Starting system monitor"}
+{"time":"2025-04-03T18:00:39.369828015+08:00","level":"INFO","msg":"stream: closing","id":"20250403_180029"}
+{"time":"2025-04-03T18:00:39.369926135+08:00","level":"INFO","msg":"Stopping system monitor"}
+{"time":"2025-04-03T18:00:39.371164385+08:00","level":"INFO","msg":"Stopped system monitor"}
+{"time":"2025-04-03T18:00:41.763739962+08:00","level":"INFO","msg":"fileTransfer: Close: file transfer manager closed"}
+{"time":"2025-04-03T18:00:42.580206054+08:00","level":"INFO","msg":"handler: closed","stream_id":"20250403_180029"}
+{"time":"2025-04-03T18:00:42.580289779+08:00","level":"INFO","msg":"sender: closed","stream_id":"20250403_180029"}
+{"time":"2025-04-03T18:00:42.580278185+08:00","level":"INFO","msg":"writer: Close: closed","stream_id":"20250403_180029"}
+{"time":"2025-04-03T18:00:42.580460208+08:00","level":"INFO","msg":"stream: closed","id":"20250403_180029"}

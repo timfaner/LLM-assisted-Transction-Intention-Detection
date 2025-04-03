@@ -1,0 +1,43 @@
+{
+  "os": "Linux-6.8.0-57-generic-x86_64-with-glibc2.35",
+  "python": "CPython 3.12.9",
+  "startedAt": "2025-04-03T10:02:07.093760Z",
+  "args": [
+    "--input_dir",
+    "contracts_to_analyze",
+    "--step",
+    "step2",
+    "--input_results",
+    "/home/hosen/LLM-assisted-Transction-Intention-Detection/intent_results/wandb/run-20250403_180030-20250403_180029/files/results.pkl",
+    "--model_type",
+    "api",
+    "--model_name",
+    "gpt-3.5-turbo",
+    "--num_tests",
+    "1"
+  ],
+  "program": "-m sc_analyzer.main",
+  "git": {
+    "remote": "git@github.com:Hosen-oos/LLM-assisted-Transction-Intention-Detection.git",
+    "commit": "8e4a4b2be620da9f400eb2a18b5a3ac2d44c6d0f"
+  },
+  "email": "S230130@e.ntu.edu.sg",
+  "root": "/home/hosen/LLM-assisted-Transction-Intention-Detection/intent_results",
+  "host": "Hosen",
+  "executable": "/home/hosen/miniconda3/bin/python",
+  "cpu_count": 8,
+  "cpu_count_logical": 12,
+  "disk": {
+    "/": {
+      "total": "139002019840",
+      "used": "82726191104"
+    }
+  },
+  "memory": {
+    "total": "16479744000"
+  },
+  "cpu": {
+    "count": 8,
+    "countLogical": 12
+  }
+}

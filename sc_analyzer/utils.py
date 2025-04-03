@@ -189,19 +189,56 @@ def wandb_restore(wandb_run, filename):
 
 
 def save_results(results, output_dir, filename='results.pkl'):
-    """将结果保存到pickle文件并同步到wandb。"""
-    # 保存到本地
-    output_path = Path(output_dir) / filename
-    with open(output_path, 'wb') as f:
-        pickle.dump(results, f)
-    logging.info(f"结果已保存到本地: {output_path}")
+    """将结果保存到pickle文件并同步到wandb。
+    
+    Args:
+        results: 要保存的结果数据
+        output_dir: 输出目录
+        filename: 输出文件名
+        
+    Returns:
+        保存的文件路径
+    """
+    # 确保输出目录存在
+    output_dir = Path(output_dir)
+    output_dir.mkdir(parents=True, exist_ok=True)
+    
+    # 构建完整的输出路径
+    output_path = output_dir / filename
+    
+    # 保存到本地文件
+    try:
+        with open(output_path, 'wb') as f:
+            pickle.dump(results, f)
+        logging.info(f"结果已保存到本地: {output_path}")
+    except Exception as e:
+        logging.error(f"保存结果到本地文件时出错: {e}")
+        if debug:
+            logging.error(traceback.format_exc())
+        return None
     
     # 同步到wandb
     try:
-        wandb.save(str(output_path))
+        # 使用base_path参数来保持文件夹结构
+        wandb.save(str(output_path), base_path=str(output_dir))
         logging.info(f"结果已同步到wandb")
     except Exception as e:
         logging.error(f"同步到wandb时出错: {e}")
+        if debug:
+            logging.error(traceback.format_exc())
+    
+    # 同时保存到files/文件夹
+    try:
+        files_dir = output_dir.parent / "files"
+        files_dir.mkdir(parents=True, exist_ok=True)
+        files_path = files_dir / filename
+        with open(files_path, 'wb') as f:
+            pickle.dump(results, f)
+        logging.info(f"结果已保存到files文件夹: {files_path}")
+    except Exception as e:
+        logging.error(f"保存结果到files文件夹时出错: {e}")
+        if debug:
+            logging.error(traceback.format_exc())
     
     return str(output_path)
 

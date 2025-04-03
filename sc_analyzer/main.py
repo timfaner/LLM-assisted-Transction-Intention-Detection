@@ -16,7 +16,8 @@ import torch
 
 from sc_analyzer.models import get_model
 from sc_analyzer.utils import (
-    setup_logger, log_w_indent, md5hash, save_results, read_smart_contract
+    setup_logger, log_w_indent, md5hash, save_results,
+    read_smart_contract, load_results
 )
 
 # Global constants
@@ -131,15 +132,30 @@ def main(args):
         https_proxy=args.https_proxy
     )
     
-    # Scan the input directory for contract folders
-    contracts_path = Path(args.input_dir)
-    contract_folders = [f for f in contracts_path.iterdir() if f.is_dir()]
-    logging.info(f"在{args.input_dir}中找到{len(contract_folders)}个合约文件夹")
+    # 根据步骤参数执行相应的处理
+    if args.step == "step1" or args.step == "all":
+        results = step1_generate_intents(args, model, run_dir)
+    elif args.step == "step2":
+        if not args.input_results:
+            logging.error("step2需要指定上一步的结果文件路径(--input_results)")
+            return 1
+        results = step2_generate_questions(args, model, run_dir)
+    elif args.step == "step3":
+        if not args.input_results:
+            logging.error("step3需要指定上一步的结果文件路径(--input_results)")
+            return 1
+        results = step3_generate_answers(args, model, run_dir)
     
-    if len(contract_folders) == 0:
-        logging.warning(f"警告：在{args.input_dir}中未找到任何合约文件夹")
+    # 保存最终结果
+    if args.step != "all":
+        results['test_config']['test_end_time'] = datetime.datetime.now().isoformat()
+        save_results(results, wandb.run.dir, RESULTS_FILENAME)
     
-    # Process each contract folder
+    logging.info(f"已完成 {len(results['contract_intents'])} 个合约的分析")
+    logging.info(f"结果已保存到 {wandb.run.dir}/{RESULTS_FILENAME}")
+
+def step1_generate_intents(args, model, run_dir):
+    """步骤1：生成意图"""
     results = {
         'contract_intents': {},
         'prompts': model.get_prompts_for_log(),
@@ -147,124 +163,56 @@ def main(args):
         'test_config': {
             'num_tests': args.num_tests,
             'test_start_time': datetime.datetime.now().isoformat()
+        },
+        'indexes': {
+            'intent_index': {},
+            'section_index': {},
+            'question_index': {},
+            'answer_index': {}
         }
     }
     
-    # 添加辅助索引，用于快速查找意图和问题
-    results['indexes'] = {
-        'intent_index': {},      # intent_id -> 合约路径和测试索引
-        'section_index': {},     # section_id -> intent_id 和部分名称
-        'question_index': {},    # question_id -> section_id 和问题索引
-        'answer_index': {}       # answer_id -> question_id 和答案索引
-    }
+    # Scan the input directory for contract folders
+    contracts_path = Path(args.input_dir)
+    contract_folders = [f for f in contracts_path.iterdir() if f.is_dir()]
+    logging.info(f"在{args.input_dir}中找到{len(contract_folders)}个合约文件夹")
     
     for idx, contract_folder in enumerate(contract_folders):
         if idx >= args.max_contracts and args.max_contracts > 0:
-            logging.info(f"已达到要处理的最大合约数量({args.max_contracts})")
             break
             
         relative_path = contract_folder.relative_to(contracts_path)
         logging.info(f"正在处理合约文件夹 {idx+1}/{len(contract_folders)}: {relative_path}")
         
         # 查找合约文件和交易数据文件
-        contract_file = None
-        transaction_file = None
-        
-        # 列出文件夹内容用于调试
-        if args.debug:
-            logging.debug(f"文件夹 {contract_folder} 内容:")
-            for file in contract_folder.iterdir():
-                logging.debug(f"  - {file.name} ({file.suffix})")
-        
-        for file in contract_folder.iterdir():
-            if file.suffix.lower() == '.sol':
-                contract_file = file
-                logging.info(f"找到合约文件: {file.name}")
-            elif file.suffix.lower() in ['.json', '.xlsx', '.csv', '.txt']:
-                transaction_file = file
-                logging.info(f"找到交易数据文件: {file.name}")
-        
+        contract_file, transaction_file = find_contract_files(contract_folder, args.debug)
         if not contract_file:
-            logging.error(f"在文件夹 {contract_folder} 中未找到.sol合约文件")
             continue
             
-        if not transaction_file:
-            logging.warning(f"在文件夹 {contract_folder} 中未找到交易数据文件")
-        
         # 读取合约内容
         try:
             contract_content = read_smart_contract(contract_file)
-            logging.info(f"合约文件 {contract_file.name} 读取成功，大小：{len(contract_content)}字节")
+            transaction_data = read_transaction_data(transaction_file) if transaction_file else ""
             
-            # 输出合约内容的简短摘要用于调试
-            if args.debug:
-                content_preview = contract_content[:100] + ("..." if len(contract_content) > 100 else "")
-                logging.debug(f"合约内容预览: {content_preview}")
-        except Exception as e:
-            logging.error(f"读取合约文件 {contract_file} 时出错: {e}")
-            if args.debug:
-                logging.error(traceback.format_exc())
-            continue
-        
-        # 读取交易数据
-        transaction_data = ""
-        if transaction_file:
-            try:
-                if transaction_file.suffix.lower() == '.json':
-                    with open(transaction_file, 'r', encoding='utf-8') as f:
-                        transaction_data = json.dumps(json.load(f), indent=2)
-                else:
-                    with open(transaction_file, 'r', encoding='utf-8') as f:
-                        transaction_data = f.read()
-                logging.info(f"交易数据文件 {transaction_file.name} 读取成功，大小：{len(transaction_data)}字节")
-                
-                # 输出交易数据的简短摘要用于调试
-                if args.debug:
-                    data_preview = transaction_data[:100] + ("..." if len(transaction_data) > 100 else "")
-                    logging.debug(f"交易数据预览: {data_preview}")
-            except Exception as e:
-                logging.error(f"读取交易文件 {transaction_file} 时出错: {e}")
-                if args.debug:
-                    logging.error(traceback.format_exc())
-        
-        # Create a list to store results for each contract
-        contract_results = []
-        
-        # Perform n tests for each contract
-        for test_idx in range(args.num_tests):
-            logging.info(f"正在进行测试 {test_idx+1}/{args.num_tests}")
-            
-            # Generate intent using LLM
-            try:
-                logging.info(f"正在调用模型生成意图...")
+            # 生成意图
+            contract_results = []
+            for test_idx in range(args.num_tests):
                 intent_result = model.generate_intent(contract_content, transaction_data)
                 
-                # 解包返回结果
                 if isinstance(intent_result, tuple) and len(intent_result) >= 3:
                     intent, token_log_likelihoods, embedding = intent_result
                 else:
-                    # 兼容旧版本返回格式
                     intent = intent_result
                     token_log_likelihoods = []
                     embedding = None
                 
-                logging.info(f"已为 {relative_path} 生成第 {test_idx+1} 次意图，长度: {len(intent)}字符")
-                log_w_indent(f"意图 {test_idx+1} 前100个字符: {intent[:100]}...", indent=1)
-                
-                # 解析意图的各个部分
-                parsed_sections = parse_intent_sections(intent)
-                logging.info(f"意图已分解为 {len(parsed_sections)} 个部分")
-                
-                # 生成唯一的意图标识符
                 intent_id = generate_unique_id(prefix=f"intent_{contract_file.stem}_{test_idx}_")
                 
-                # 更新索引
                 results['indexes']['intent_index'][intent_id] = {
                     'contract_path': str(relative_path),
                     'test_idx': test_idx
                 }
                 
-                # 重新组织数据结构，添加唯一标识符和明确的层次关系
                 intent_data = {
                     'intent_id': intent_id,
                     'test_id': test_idx,
@@ -274,107 +222,9 @@ def main(args):
                     'intent': intent,
                     'intent_length': len(intent),
                     'token_log_likelihoods': token_log_likelihoods,
-                    'embedding': embedding,
-                    'sections': []  # 将单独填充各部分
+                    'embedding': embedding
                 }
                 
-                # 处理每个部分
-                total_questions = 0
-                total_answers = 0
-                
-                for section_name in INTENT_SECTIONS:
-                    section_content = parsed_sections.get(section_name, "")
-                    if not section_content:
-                        logging.warning(f"未找到 {section_name} 部分内容")
-                        continue
-                    
-                    section_id = generate_unique_id(prefix=f"{intent_id}_{section_name}_")
-                    
-                    # 更新索引
-                    results['indexes']['section_index'][section_id] = {
-                        'intent_id': intent_id,
-                        'section_name': section_name
-                    }
-                    
-                    logging.info(f"正在为 {section_name} 部分生成问题...")
-                    
-                    # 为该部分生成问题
-                    section_questions = model.generate_questions_for_section(section_content, section_name)
-                    logging.info(f"为 {section_name} 部分成功生成 {len(section_questions)} 个问题")
-                    
-                    # 记录问题
-                    for q_idx, question in enumerate(section_questions):
-                        log_w_indent(f"{section_name} 问题 {q_idx+1}: {question[:100]}...", indent=2)
-                    
-                    section_data = {
-                        'section_id': section_id,
-                        'intent_id': intent_id,
-                        'section_name': section_name,
-                        'content': section_content,
-                        'questions': []
-                    }
-                    
-                    # 为每个问题生成答案
-                    questions_list = []
-                    
-                    for q_idx, question in enumerate(section_questions):
-                        question_id = generate_unique_id(prefix=f"{section_id}_q{q_idx}_")
-                        
-                        # 更新索引
-                        results['indexes']['question_index'][question_id] = {
-                            'section_id': section_id,
-                            'question_idx': q_idx
-                        }
-                        
-                        logging.info(f"正在为 {section_name} 部分的问题 {q_idx+1} 生成答案...")
-                        
-                        # 生成答案
-                        answers = model.generate_answers(question, section_content)
-                        total_answers += len(answers)
-                        
-                        # 收集问题的logprob值但不计算熵
-                        log_likelihoods = [a['avg_logprob'] for a in answers if a['avg_logprob'] is not None]
-                        
-                        question_data = {
-                            'question_id': question_id,
-                            'section_id': section_id,
-                            'intent_id': intent_id,
-                            'question_idx': q_idx,
-                            'question': question,
-                            'answers': [],
-                            'log_likelihoods': log_likelihoods
-                        }
-                        
-                        # 添加答案
-                        for a_idx, answer_data in enumerate(answers):
-                            answer_id = generate_unique_id(prefix=f"{question_id}_a{a_idx}_")
-                            
-                            # 更新索引
-                            results['indexes']['answer_index'][answer_id] = {
-                                'question_id': question_id,
-                                'answer_idx': a_idx
-                            }
-                            
-                            answer_entry = {
-                                'answer_id': answer_id,
-                                'question_id': question_id,
-                                'section_id': section_id,
-                                'intent_id': intent_id,
-                                'answer_idx': a_idx,
-                                'answer': answer_data['answer'],
-                                'avg_logprob': answer_data['avg_logprob'],
-                                'logprobs': answer_data['logprobs']
-                            }
-                            
-                            question_data['answers'].append(answer_entry)
-                        
-                        questions_list.append(question_data)
-                    
-                    section_data['questions'] = questions_list
-                    total_questions += len(questions_list)
-                    intent_data['sections'].append(section_data)
-                
-                # 添加意图数据到结果
                 contract_results.append(intent_data)
                 
                 # Log to wandb
@@ -385,10 +235,7 @@ def main(args):
                     'latest_intent_length': len(intent),
                     'token_log_likelihood_available': len(token_log_likelihoods) > 0,
                     'avg_token_log_likelihood': sum(token_log_likelihoods) / len(token_log_likelihoods) if token_log_likelihoods else None,
-                    'embedding_available': embedding is not None,
-                    'num_sections_processed': len(intent_data['sections']),
-                    'num_questions_generated': total_questions,
-                    'num_answers_generated': total_answers
+                    'embedding_available': embedding is not None
                 }
                 
                 if embedding is not None:
@@ -396,13 +243,12 @@ def main(args):
                 
                 wandb.log(log_data)
                 
-            except Exception as e:
-                logging.error(f"为合约 {contract_folder} 生成第 {test_idx+1} 次意图时出错: {e}")
-                if args.debug:
-                    logging.error(traceback.format_exc())
-                continue
+        except Exception as e:
+            logging.error(f"处理合约 {contract_folder} 时出错: {e}")
+            if args.debug:
+                logging.error(traceback.format_exc())
+            continue
         
-        # Save all test results for the contract
         results['contract_intents'][str(relative_path)] = {
             'folder_path': str(contract_folder),
             'relative_path': str(relative_path),
@@ -412,38 +258,153 @@ def main(args):
             'content_hash': md5hash(contract_content),
             'test_results': contract_results
         }
-            
-        # Save intermediate results
+        
         if args.save_interval > 0 and (idx + 1) % args.save_interval == 0:
-            results['test_config']['last_processed'] = str(contract_folder)
             save_results(results, wandb.run.dir, RESULTS_FILENAME)
-            logging.info(f"已保存中间结果，完成了 {idx}/{len(contract_folders)} 个合约的处理")
     
-    # Save final results
-    results['test_config']['test_end_time'] = datetime.datetime.now().isoformat()
-    # 保存到wandb
-    save_results(results, wandb.run.dir, RESULTS_FILENAME)
-    # 同时直接保存到项目目录
-    save_direct_results(results, run_dir)
+    return results
+
+def step2_generate_questions(args, model, run_dir):
+    """步骤2：生成问题"""
+    # 加载上一步的结果
+    results = load_results(args.input_results)
+    if not results:
+        raise ValueError("无法加载上一步的结果文件")
     
-    logging.info(f"已完成 {len(results['contract_intents'])} 个合约的分析")
-    logging.info(f"结果已保存到 {wandb.run.dir}/{RESULTS_FILENAME} 和 {run_dir}/files/{RESULTS_FILENAME}")
+    for contract_path, contract_data in results['contract_intents'].items():
+        for intent_data in contract_data['test_results']:
+            intent = intent_data['intent']
+            intent_id = intent_data['intent_id']
+            
+            # 解析意图的各个部分
+            parsed_sections = parse_intent_sections(intent)
+            
+            # 为每个部分生成问题
+            for section_name in INTENT_SECTIONS:
+                section_content = parsed_sections.get(section_name, "")
+                if not section_content:
+                    continue
+                
+                section_id = generate_unique_id(prefix=f"{intent_id}_{section_name}_")
+                
+                results['indexes']['section_index'][section_id] = {
+                    'intent_id': intent_id,
+                    'section_name': section_name
+                }
+                
+                # 生成问题
+                section_questions = model.generate_questions_for_section(section_content, section_name)
+                
+                # 记录问题
+                for q_idx, question in enumerate(section_questions):
+                    question_id = generate_unique_id(prefix=f"{section_id}_q{q_idx}_")
+                    
+                    results['indexes']['question_index'][question_id] = {
+                        'section_id': section_id,
+                        'question_idx': q_idx
+                    }
+                    
+                    if 'sections' not in intent_data:
+                        intent_data['sections'] = []
+                    
+                    section_data = {
+                        'section_id': section_id,
+                        'intent_id': intent_id,
+                        'section_name': section_name,
+                        'content': section_content,
+                        'questions': [{
+                            'question_id': question_id,
+                            'section_id': section_id,
+                            'intent_id': intent_id,
+                            'question_idx': q_idx,
+                            'question': question
+                        }]
+                    }
+                    
+                    intent_data['sections'].append(section_data)
+    
+    return results
 
-def save_results(results, output_dir, filename):
-    """将结果保存到pickle文件。"""
-    output_path = os.path.join(output_dir, filename)
-    with open(output_path, 'wb') as f:
-        pickle.dump(results, f)
-    logging.info(f"结果已保存到 {output_path}")
-    wandb.save(filename)
+def step3_generate_answers(args, model, run_dir):
+    """步骤3：生成答案"""
+    # 加载上一步的结果
+    results = load_results(args.input_results)
+    if not results:
+        raise ValueError("无法加载上一步的结果文件")
+    
+    for contract_path, contract_data in results['contract_intents'].items():
+        for intent_data in contract_data['test_results']:
+            if 'sections' not in intent_data:
+                continue
+                
+            for section_data in intent_data['sections']:
+                for question_data in section_data['questions']:
+                    question = question_data['question']
+                    question_id = question_data['question_id']
+                    
+                    # 生成答案
+                    answers = model.generate_answers(question, section_data['content'])
+                    
+                    # 记录答案
+                    question_data['answers'] = []
+                    for a_idx, answer_data in enumerate(answers):
+                        answer_id = generate_unique_id(prefix=f"{question_id}_a{a_idx}_")
+                        
+                        results['indexes']['answer_index'][answer_id] = {
+                            'question_id': question_id,
+                            'answer_idx': a_idx
+                        }
+                        
+                        answer_entry = {
+                            'answer_id': answer_id,
+                            'question_id': question_id,
+                            'section_id': section_data['section_id'],
+                            'intent_id': intent_data['intent_id'],
+                            'answer_idx': a_idx,
+                            'answer': answer_data['answer'],
+                            'avg_logprob': answer_data['avg_logprob'],
+                            'logprobs': answer_data['logprobs']
+                        }
+                        
+                        question_data['answers'].append(answer_entry)
+    
+    return results
 
-def save_direct_results(results, run_dir):
-    """直接将结果保存到指定目录，不依赖wandb。"""
-    output_path = run_dir / "files" / RESULTS_FILENAME
-    with open(output_path, 'wb') as f:
-        pickle.dump(results, f)
-    logging.info(f"结果已直接保存到 {output_path}")
-    return str(output_path)
+def find_contract_files(contract_folder, debug=False):
+    """查找合约文件和交易数据文件"""
+    contract_file = None
+    transaction_file = None
+    
+    if debug:
+        logging.debug(f"文件夹 {contract_folder} 内容:")
+        for file in contract_folder.iterdir():
+            logging.debug(f"  - {file.name} ({file.suffix})")
+    
+    for file in contract_folder.iterdir():
+        if file.suffix.lower() == '.sol':
+            contract_file = file
+            logging.info(f"找到合约文件: {file.name}")
+        elif file.suffix.lower() in ['.json', '.xlsx', '.csv', '.txt']:
+            transaction_file = file
+            logging.info(f"找到交易数据文件: {file.name}")
+    
+    if not contract_file:
+        logging.error(f"在文件夹 {contract_folder} 中未找到.sol合约文件")
+    
+    return contract_file, transaction_file
+
+def read_transaction_data(transaction_file):
+    """读取交易数据文件"""
+    try:
+        if transaction_file.suffix.lower() == '.json':
+            with open(transaction_file, 'r', encoding='utf-8') as f:
+                return json.dumps(json.load(f), indent=2)
+        else:
+            with open(transaction_file, 'r', encoding='utf-8') as f:
+                return f.read()
+    except Exception as e:
+        logging.error(f"读取交易文件 {transaction_file} 时出错: {e}")
+        return ""
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="智能合约意图分析器")
@@ -459,6 +420,12 @@ if __name__ == "__main__":
                         help="每处理这么多合约后保存结果（0表示禁用）")
     parser.add_argument("--num_tests", type=int, default=6,
                         help="每个合约运行的测试次数")
+    
+    # Step execution options
+    parser.add_argument("--step", type=str, choices=["step1", "step2", "step3", "all"], default="all",
+                        help="执行步骤：step1(生成意图), step2(生成问题), step3(生成答案), all(完整流程)")
+    parser.add_argument("--input_results", type=str, default=None,
+                        help="上一步骤的结果文件路径（用于step2和step3）")
     
     # Model options
     parser.add_argument("--model_type", type=str, default="api",

@@ -8,6 +8,7 @@ import wandb
 import numpy as np
 import math
 from typing import List, Dict, Union, Any, Optional
+import traceback
 
 
 def setup_logger(debug=False):
@@ -188,11 +189,20 @@ def wandb_restore(wandb_run, filename):
 
 
 def save_results(results, output_dir, filename='results.pkl'):
-    """将结果保存到pickle文件。"""
+    """将结果保存到pickle文件并同步到wandb。"""
+    # 保存到本地
     output_path = Path(output_dir) / filename
     with open(output_path, 'wb') as f:
         pickle.dump(results, f)
-    logging.info(f"结果已保存到{output_path}")
+    logging.info(f"结果已保存到本地: {output_path}")
+    
+    # 同步到wandb
+    try:
+        wandb.save(str(output_path))
+        logging.info(f"结果已同步到wandb")
+    except Exception as e:
+        logging.error(f"同步到wandb时出错: {e}")
+    
     return str(output_path)
 
 
@@ -203,20 +213,17 @@ def load_results(results_path):
         results_path: Pickle文件的路径
         
     Returns:
-        加载的结果数据
+        加载的结果数据，如果加载失败则返回None
     """
-    results_path = Path(results_path)
-    if not results_path.exists():
-        logging.error(f"结果文件不存在: {results_path}")
-        return None
-    
     try:
         with open(results_path, 'rb') as f:
             results = pickle.load(f)
-        logging.info(f"从{results_path}加载结果成功")
+        logging.info(f"成功从 {results_path} 加载结果")
         return results
     except Exception as e:
-        logging.error(f"加载结果时出错: {e}")
+        logging.error(f"加载结果文件 {results_path} 时出错: {e}")
+        if debug:
+            logging.error(traceback.format_exc())
         return None
 
 

@@ -1,0 +1,24 @@
+2025-04-05 11:04:23 INFO     新运行开始，配置如下:
+2025-04-05 11:04:23 INFO     Namespace(input_dir='contracts_to_analyze', wandb_dir=None, max_contracts=0, save_interval=10, num_tests=6, step='step2', input_results='/home/hosen/LLM-assisted-Transction-Intention-Detection/intent_results/wandb/run-20250405_110047-20250405_110045/files/results.pkl', model_type='api', model_name='gpt-3.5-turbo', embedding_model='text-embedding-ada-002', api_key=None, use_local=False, local_model_path=None, device='cpu', http_proxy=None, https_proxy=None, debug=False)
+2025-04-05 11:04:23 INFO     Wandb设置完成。
+2025-04-05 11:04:23 INFO     使用API模型：通过openai API使用gpt-3.5-turbo，嵌入模型：text-embedding-ada-002
+2025-04-05 11:04:23 INFO     使用代理配置：HTTP:http://127.0.0.1:45345, HTTPS:http://127.0.0.1:45345
+2025-04-05 11:04:24 INFO     API客户端初始化成功
+2025-04-05 11:04:24 INFO     成功从 /home/hosen/LLM-assisted-Transction-Intention-Detection/intent_results/wandb/run-20250405_110047-20250405_110045/files/results.pkl 加载结果
+2025-04-05 11:04:25 INFO     HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2025-04-05 11:04:27 INFO     HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2025-04-05 11:04:28 INFO     HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2025-04-05 11:04:29 INFO     HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2025-04-05 11:04:29 ERROR    解析问题时出错: Expecting value: line 1 column 1 (char 0)
+2025-04-05 11:04:29 ERROR    API返回的原始内容: ```json
+[
+    "How does the change in token balances of the involved addresses impact the overall token supply?",
+    "What potential consequences arise if the sender address is the contract owner in this transaction?",
+    "What are the risks associated with conducting transactions on a deprecated contract compared to an upgraded contract?"
+]
+```
+2025-04-05 11:04:29 INFO     结果已保存到本地: /home/hosen/LLM-assisted-Transction-Intention-Detection/intent_results/wandb/run-20250405_110422-20250405_110421/files/results.pkl
+2025-04-05 11:04:29 INFO     结果已同步到wandb
+2025-04-05 11:04:29 INFO     结果已保存到files文件夹: /home/hosen/LLM-assisted-Transction-Intention-Detection/intent_results/wandb/run-20250405_110422-20250405_110421/files/results.pkl
+2025-04-05 11:04:29 INFO     已完成 1 个合约的分析
+2025-04-05 11:04:29 INFO     结果已保存到 /home/hosen/LLM-assisted-Transction-Intention-Detection/intent_results/wandb/run-20250405_110422-20250405_110421/files/results.pkl

@@ -34,7 +34,8 @@ class SemanticEntropyCalculator:
         results_path: str, 
         output_dir: Optional[str] = None,
         device: Optional[str] = None,
-        use_api_for_equivalence: bool = True
+        use_api_for_equivalence: bool = True,
+        mode: str = "step3"
     ):
         """
         初始化语义熵计算器。
@@ -44,9 +45,11 @@ class SemanticEntropyCalculator:
             output_dir: 保存熵结果的目录
             device: 运行模型的设备('cuda'或'cpu')
             use_api_for_equivalence: 是否使用LLM API进行语义等价判断
+            mode: 生成模式 ("step3" 或 "all")
         """
         self.results_path = Path(results_path)
         self.use_api_for_equivalence = use_api_for_equivalence
+        self.mode = mode
         
         # Set output directory
         if output_dir:
@@ -60,6 +63,7 @@ class SemanticEntropyCalculator:
             self.results = pickle.load(f)
             
         logging.info(f"已加载结果文件: {self.results_path}")
+        logging.info(f"使用模式: {self.mode}")
         
         # API相关设置（仅在use_api_for_equivalence为True时使用）
         self.api_client = None
@@ -507,12 +511,40 @@ class SemanticEntropyCalculator:
         logging.info("开始计算语义熵...")
         start_time = time.time()
         
-        # 计算所有熵值
-        entropy_results = self.calculate_all_entropies()
+        # 检查结果中是否包含必要的数据
+        if "contract_intents" not in self.results:
+            raise ValueError("结果中缺少 'contract_intents' 字段")
+        
+        # 检查是否包含step3的数据（问题和答案）
+        has_step3_data = False
+        for contract_data in self.results["contract_intents"].values():
+            for intent_data in contract_data.get("test_results", []):
+                if "sections" in intent_data:
+                    for section in intent_data["sections"]:
+                        if "questions" in section:
+                            for question in section["questions"]:
+                                if "answers" in question:
+                                    has_step3_data = True
+                                    break
+        
+        if not has_step3_data:
+            raise ValueError("结果中缺少step3的数据（问题和答案），无法计算语义熵")
+        
+        # 根据模式计算熵值
+        if self.mode == "step3":
+            entropy_results = self.calculate_entropy_from_step3_results(self.results)
+        elif self.mode == "all":
+            # 对于all模式，我们仍然使用step3的方法，因为只有step3有答案和logprob
+            entropy_results = self.calculate_entropy_from_step3_results(self.results)
+        else:
+            raise ValueError(f"不支持的模式: {self.mode}，只支持 'step3' 或 'all'")
         
         # 添加时间信息
         end_time = time.time()
-        entropy_results["summary"]["time_taken"] = end_time - start_time
+        entropy_results["summary"] = {
+            "time_taken": end_time - start_time,
+            "mode": self.mode
+        }
         
         # 保存结果
         results_path = self.output_dir / "entropy_results.pkl"
@@ -527,7 +559,79 @@ class SemanticEntropyCalculator:
         logging.info(f"语义熵计算完成，耗时: {end_time - start_time:.2f}秒")
         logging.info(f"结果已保存至: {results_path}")
         logging.info(f"摘要已保存至: {summary_path}")
-        logging.info(f"整体平均语义熵: {entropy_results['summary']['avg_overall_entropy']:.4f}")
+        logging.info(f"整体平均语义熵: {entropy_results['overall_entropy']:.4f}")
+        
+        return entropy_results
+
+    def calculate_entropy_from_step3_results(self, results: Dict) -> Dict:
+        """
+        从step3的结果计算语义熵。
+        
+        参数:
+            results: step3生成的结果字典
+            
+        返回:
+            包含语义熵计算结果的字典
+        """
+        entropy_results = {
+            'questions': [],
+            'overall_entropy': 0.0
+        }
+        
+        total_entropy = 0.0
+        question_count = 0
+        
+        # 遍历所有合约
+        for contract_path, contract_data in results['contract_intents'].items():
+            # 遍历每个意图的测试结果
+            for intent_data in contract_data['test_results']:
+                if 'sections' not in intent_data:
+                    continue
+                    
+                # 遍历每个部分
+                for section_data in intent_data['sections']:
+                    # 遍历每个问题
+                    for question_data in section_data['questions']:
+                        if 'answers' not in question_data:
+                            continue
+                            
+                        # 提取答案文本和对数概率
+                        answers = []
+                        log_probs = []
+                        
+                        for answer in question_data['answers']:
+                            answer_text = answer.get('answer', '')
+                            logprob = answer.get('avg_logprob')
+                            
+                            if answer_text and logprob is not None:
+                                answers.append(answer_text)
+                                log_probs.append(logprob)
+                        
+                        if not answers or not log_probs:
+                            continue
+                            
+                        # 对答案进行语义聚类
+                        cluster_ids = self.get_semantic_ids(answers)
+                        
+                        # 计算该问题的语义熵
+                        question_entropy = self.calculate_cluster_entropy(cluster_ids, log_probs)
+                        
+                        # 记录问题级别的熵
+                        entropy_results['questions'].append({
+                            'question_id': question_data['question_id'],
+                            'question': question_data['question'],
+                            'section_name': section_data['section_name'],
+                            'entropy': question_entropy,
+                            'num_answers': len(answers),
+                            'num_clusters': len(set(cluster_ids))
+                        })
+                        
+                        total_entropy += question_entropy
+                        question_count += 1
+        
+        # 计算整体平均熵
+        if question_count > 0:
+            entropy_results['overall_entropy'] = total_entropy / question_count
         
         return entropy_results
 

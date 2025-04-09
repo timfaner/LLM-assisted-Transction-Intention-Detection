@@ -9,20 +9,40 @@ import numpy as np
 import math
 from typing import List, Dict, Union, Any, Optional
 import traceback
+import uuid
+from sc_analyzer.data_types import AnalysisResults
 
 
-def setup_logger(debug=False):
-    """Setup logger to always print time and level."""
-    level = logging.DEBUG if debug else logging.INFO
+def setup_logger(log_level="INFO"):
+    """设置日志配置。
+    
+    Args:
+        log_level: 日志级别，可以是'DEBUG', 'INFO', 'WARNING', 'ERROR', 'CRITICAL'
+    """
+    # 将字符串日志级别转换为对应的数值
+    level_map = {
+        "DEBUG": logging.DEBUG,
+        "INFO": logging.INFO,
+        "WARNING": logging.WARNING,
+        "ERROR": logging.ERROR,
+        "CRITICAL": logging.CRITICAL
+    }
+    
+    # 确保log_level是有效的，默认为INFO
+    numeric_level = level_map.get(log_level.upper(), logging.INFO)
     
     logging.basicConfig(
-        format='%(asctime)s %(levelname)-8s %(message)s',
-        level=level,
+        format='%(asctime)s  %(message)s',
+        level=numeric_level,
         datefmt='%Y-%m-%d %H:%M:%S')
-    logging.getLogger().setLevel(level)
+    logging.getLogger().setLevel(numeric_level)
     
-    if debug:
-        logging.debug("调试模式已启用 - 将显示详细日志")
+    
+    logging.debug("调试模式已启用 - 将显示详细日志")
+
+    # 设置openai和httpx的日志级别为INFO
+    logging.getLogger("openai").setLevel(logging.INFO)
+    logging.getLogger("httpx").setLevel(logging.INFO)
 
 
 def log_w_indent(text, indent=0, symbol='>>'):
@@ -186,9 +206,14 @@ def wandb_restore(wandb_run, filename):
     except Exception as e:
         logging.error(f"从wandb恢复时出错：{e}")
         return None, None
+def generate_unique_id(prefix="", suffix=""):
+    """生成带有前缀和后缀的唯一标识符。"""
+    unique_part = str(uuid.uuid4()).split("-")[0]  # 取UUID的第一部分作为简短标识符
+    return f"{prefix}{unique_part}{suffix}"
 
 
-def save_results(results, output_dir, filename='results.pkl'):
+
+def save_results(results: AnalysisResults, output_dir, filename='results.pkl'):
     """将结果保存到pickle文件并同步到wandb。
     
     Args:
@@ -213,8 +238,8 @@ def save_results(results, output_dir, filename='results.pkl'):
         logging.info(f"结果已保存到本地: {output_path}")
     except Exception as e:
         logging.error(f"保存结果到本地文件时出错: {e}")
-        if debug:
-            logging.error(traceback.format_exc())
+        if logging.getLogger().level <= logging.DEBUG:
+            logging.debug(traceback.format_exc())
         return None
     
     # 同步到wandb
@@ -224,26 +249,13 @@ def save_results(results, output_dir, filename='results.pkl'):
         logging.info(f"结果已同步到wandb")
     except Exception as e:
         logging.error(f"同步到wandb时出错: {e}")
-        if debug:
-            logging.error(traceback.format_exc())
-    
-    # 同时保存到files/文件夹
-    try:
-        files_dir = output_dir.parent / "files"
-        files_dir.mkdir(parents=True, exist_ok=True)
-        files_path = files_dir / filename
-        with open(files_path, 'wb') as f:
-            pickle.dump(results, f)
-        logging.info(f"结果已保存到files文件夹: {files_path}")
-    except Exception as e:
-        logging.error(f"保存结果到files文件夹时出错: {e}")
-        if debug:
-            logging.error(traceback.format_exc())
+        if logging.getLogger().level <= logging.DEBUG:
+            logging.debug(traceback.format_exc())
     
     return str(output_path)
 
 
-def load_results(results_path):
+def load_results(results_path) -> Optional[AnalysisResults]:
     """从pickle文件加载结果。
     
     Args:
@@ -259,8 +271,7 @@ def load_results(results_path):
         return results
     except Exception as e:
         logging.error(f"加载结果文件 {results_path} 时出错: {e}")
-        if debug:
-            logging.error(traceback.format_exc())
+        logging.debug(traceback.format_exc())
         return None
 
 

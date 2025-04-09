@@ -11,6 +11,9 @@ import argparse
 import glob
 import statistics
 from pathlib import Path
+from typing import Dict, List, Optional, Any
+
+from sc_analyzer.data_types import AnalysisResults
 
 
 def format_analysis(text, width=100):
@@ -29,7 +32,7 @@ def format_analysis(text, width=100):
     return '\n'.join(lines)
 
 
-def get_latest_results_file():
+def get_latest_results_file() -> Optional[str]:
     """获取最新的结果文件"""
     # 查找结果文件的可能位置
     script_dir = Path(__file__).resolve().parent
@@ -73,7 +76,7 @@ def format_logprobs(logprobs):
         return f"计算统计时出错: {e}"
 
 
-def view_results(results_file=None, output_file=None, max_sections=None, max_questions=None, max_answers=None, full_text=False):
+def view_results(results_file=None, output_file=None, max_sections=None, max_questions=None, max_answers=None, full_text=False) -> None:
     """查看智能合约分析结果"""
     if not results_file:
         results_file = get_latest_results_file()
@@ -82,7 +85,7 @@ def view_results(results_file=None, output_file=None, max_sections=None, max_que
     
     try:
         with open(results_file, 'rb') as f:
-            results = pickle.load(f)
+            results: AnalysisResults = pickle.load(f)
     except Exception as e:
         print(f"无法加载结果文件 {results_file}: {e}")
         return

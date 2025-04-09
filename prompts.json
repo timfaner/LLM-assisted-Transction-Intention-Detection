@@ -1,0 +1,5 @@
+{
+    "system_prompts":{
+        "generate_answers": "You are an expert, answer the question in a short , concise way, no need to explain the answer, just answer the question."
+    }
+}

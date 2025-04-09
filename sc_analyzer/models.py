@@ -6,6 +6,8 @@ import torch
 from pathlib import Path
 import httpx
 
+from sc_analyzer.data_types import AnswerWithArgLogprobList,AnswerWithArgLogprob
+
 class BaseModel(ABC):
     """所有意图生成模型的基类。"""
     
@@ -364,7 +366,7 @@ class LocalLLMModel(BaseModel):
             ]
 
 
-class APIModel(BaseModel):
+class LegacyAPIModel(BaseModel):
     """Model using LLM API."""
     
     def __init__(self, model_name="gpt-4", api_key=None, embedding_model="text-embedding-ada-002", 
@@ -383,7 +385,7 @@ class APIModel(BaseModel):
         
         logging.info(f"使用API模型：通过{self.api_type} API使用{model_name}，嵌入模型：{embedding_model}")
         if self.http_proxy or self.https_proxy:
-            logging.info(f"使用代理配置：HTTP:{self.http_proxy}, HTTPS:{self.https_proxy}")
+            logging.debug(f"使用代理配置：HTTP:{self.http_proxy}, HTTPS:{self.https_proxy}")
             
         self._setup_client()
     
@@ -651,12 +653,158 @@ class APIModel(BaseModel):
             ]
 
 
-def get_model(model_type, model_name=None, api_key=None, use_local=False, 
-              local_model_path=None, device="cuda", embedding_model="text-embedding-ada-002",
-              http_proxy=None, https_proxy=None):
+## todo 兼容 openai, deepseek, claude
+class APIModel():
+    """Model using LLM API."""
+    
+    def __init__(self,model_provider="openai", model_name="gpt-4", api_key=None, embedding_model="text-embedding-ada-002", 
+                 http_proxy=None, https_proxy=None):
+        super().__init__()
+        self.model_name = model_name
+        self.embedding_model = embedding_model
+        
+        # 只支持OpenAI API
+        self.api_type = "openai"
+        self.api_key = api_key
+        
+        # 代理设置
+        self.http_proxy = http_proxy 
+        self.https_proxy = https_proxy
+        
+        logging.info(f"使用API模型：通过{self.api_type} API使用{model_name}，嵌入模型：{embedding_model}")
+        if self.http_proxy or self.https_proxy:
+            logging.debug(f"使用代理配置：HTTP:{self.http_proxy}, HTTPS:{self.https_proxy}")
+            
+        self._setup_client()
+    
+    def _setup_client(self):
+        """设置OpenAI客户端。"""
+        try:
+            from openai import OpenAI
+            
+            # 创建客户端时设置代理
+            client_kwargs = {"api_key": self.api_key}
+            
+            # 设置代理
+            if self.http_proxy or self.https_proxy:
+                # 根据httpx文档，直接使用字符串形式的代理
+                proxy = None
+                if self.https_proxy:  # 优先使用HTTPS代理
+                    proxy = self.https_proxy
+                elif self.http_proxy:
+                    proxy = self.http_proxy
+                
+                if proxy:
+                    # 使用httpx的正确代理设置语法：使用proxy参数而非proxies
+                    client_kwargs["http_client"] = httpx.Client(proxy=proxy)
+                
+            self.client = OpenAI(**client_kwargs)
+            logging.info(f"API客户端初始化成功")
+        except Exception as e:
+            logging.error(f"初始化API客户端时出错：{e}")
+            raise
+    
+    def get_multiple_answers(self, answers_num = 3, answers_temperature = 0.7, system_prompt = "You are an expert in smart contract analysis.",
+                             question = None):
+        """为给定的问题和意图生成答案，并返回答案及其logprob。"""
+        answers_with_logprobs:AnswerWithArgLogprobList = []
+        
+        try:
+            for i in range(answers_num):  
+                
+                messages=[
+                        {"role": "system", "content": system_prompt},
+                        {"role": "user", "content": question}
+                    ]
+                
+                output,token_log_likelihoods = self.get_response_with_probs(messages, answers_temperature, 512)
+                avg_logprob = sum(token_log_likelihoods) / len(token_log_likelihoods)
+                
+                answers_with_logprobs.append(
+                    AnswerWithArgLogprob(
+                        answer_id = i,
+                        answer=output,
+                        token_log_likelihoods=token_log_likelihoods,
+                        avg_logprob=avg_logprob
+                    )
+                )
+                
+                logging.info(f"为问题生成第{i+1}次回答，平均logprob：{avg_logprob}")
+                
+        except Exception as e:
+            logging.error(f"生成答案时出错: {e}")
+            
+        return answers_with_logprobs
+    
+    def get_response(self, messages, temperature, max_tokens=512):
+
+        response = self.client.chat.completions.create(
+            model=self.model_name,
+            messages=messages,
+            temperature=temperature,
+            max_tokens=max_tokens
+        )
+        output = response.choices[0].message.content
+        
+        return output
+    
+    def get_response_with_probs(self, messages, temperature, max_tokens=512):
+
+
+        response = self.client.chat.completions.create(
+            model=self.model_name,
+            messages=messages,
+            temperature=temperature,
+            max_tokens=max_tokens,
+            logprobs=True,
+            top_logprobs=5
+            )
+        token_log_likelihoods = []
+        output = response.choices[0].message.content
+
+        if hasattr(response.choices[0], 'logprobs') and response.choices[0].logprobs is not None:
+            for token_info in response.choices[0].logprobs.content:
+                if hasattr(token_info, 'logprob'):
+                    token_log_likelihoods.append(token_info.logprob)
+        else:
+            logging.error(f"没有找到logprobs")
+            token_log_likelihoods = None
+            
+        return output,token_log_likelihoods
+
+    
+    def get_model_info(self):
+        """Return model information."""
+        info = super().get_model_info()
+        info.update({
+            "model_name": self.model_name,
+            "api_type": self.api_type,
+            "embedding_model": self.embedding_model
+        })
+        return info
+
+
+from sc_analyzer.config import ApiKeyConfig
+
+keys = ApiKeyConfig()
+
+def get_model(model_type:str, 
+              model_name:str=None, 
+              model_provider:str="openai", 
+              local_model_path:str=None, 
+              device:str="cuda", 
+              embedding_model:str="text-embedding-ada-002",
+              http_proxy:str=None, 
+              https_proxy:str=None):
     """Factory function to get the appropriate model."""
-    if use_local or model_type == "local":
+    if model_type == "local":
         return LocalLLMModel(model_path=local_model_path, device=device)
+    elif model_type == "api":
+        return APIModel(model_name=model_name,
+                        model_provider=model_provider,
+                        api_key=keys.get_api_key(model_provider), 
+                        embedding_model=embedding_model,
+                        http_proxy=http_proxy, 
+                        https_proxy=https_proxy)
     else:
-        return APIModel(model_name=model_name, api_key=api_key, embedding_model=embedding_model,
-                      http_proxy=http_proxy, https_proxy=https_proxy)
+        raise ValueError(f"不支持的模型类型: {model_type}")

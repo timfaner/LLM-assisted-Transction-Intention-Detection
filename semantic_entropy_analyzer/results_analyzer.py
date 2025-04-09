@@ -11,13 +11,15 @@ import matplotlib.pyplot as plt
 from matplotlib.figure import Figure
 from collections import defaultdict
 
+from sc_analyzer.data_types import EntropyResults
+
 
 class ResultsAnalyzer:
     """分析语义熵结果。"""
     
     def __init__(
         self, 
-        entropy_results: Dict,  # 直接接收计算好的熵结果
+        entropy_results: EntropyResults,  # 直接接收计算好的熵结果
         output_dir: Optional[str] = None
     ):
         """

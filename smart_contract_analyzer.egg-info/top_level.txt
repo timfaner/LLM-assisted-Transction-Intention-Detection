@@ -1,2 +1,0 @@
-sc_analyzer
-semantic_entropy_analyzer

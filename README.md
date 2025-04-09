@@ -24,9 +24,9 @@
 │
 ├── intent_results/               # 分析结果输出目录
 │
-├── setup.py                      # 项目安装配置
+├── setup.py                      # 项目安装配置（已弃用）
 ├── requirements.txt              # 项目依赖
-└── view_results.py               # 查看分析结果的脚本
+└── view_results.py               # 查看分析结果的脚本（已弃用）
 ```
 
 ## 核心组件说明

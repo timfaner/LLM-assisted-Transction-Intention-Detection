@@ -268,35 +268,43 @@ class SemanticEntropyCalculator:
         if not cluster_ids or not log_probs or len(cluster_ids) != len(log_probs):
             return 0.0
             
-        # texttexttexttexttextlog_probstexttexttexttextIDtexttext
+        # texttexttexttexttextlog_probstexttexttexttexttexttextID
         valid_data = [(cid, lp) for cid, lp in zip(cluster_ids, log_probs) 
                      if lp is not None and not math.isnan(lp) and not math.isinf(lp)]
         
         if not valid_data:
             return 0.0
             
-        # texttexttextIDtexttexttexttexttexttext
+        # 1. texttexttexttexttexttexttexttexttext
+        valid_log_probs = [lp for _, lp in valid_data]
+        
+        # 2. texttexttexttexttexttexttext texttexttexttexttexttexttextlogsumexp 
+        total_log_prob = self.logsumexp(valid_log_probs)
+        
+        # 3. texttexttextIDtexttext texttexttexttexttexttexttexttexttexttexttexttext
         cluster_log_probs = defaultdict(list)
         for cluster_id, log_prob in valid_data:
-            cluster_log_probs[cluster_id].append(log_prob)
+            # texttexttexttexttexttext texttexttext
+            normalized_log_prob = log_prob - total_log_prob
+            cluster_log_probs[cluster_id].append(normalized_log_prob)
         
-        # texttexttexttexttexttexttextlogsumexptexttexttexttexttexttext
-        aggregated_log_probs = []
+        # 4. texttexttexttexttexttexttexttexttexttexttexttexttexttexttexttexttextlogsumexptexttext
+        log_likelihood_per_semantic_id = []
         for log_probs_list in cluster_log_probs.values():
             if log_probs_list:
-                aggregated_log_probs.append(self.logsumexp(log_probs_list))
+                log_likelihood_per_semantic_id.append(self.logsumexp(log_probs_list))
         
-        # texttexttexttexttexttexttexttexttexttexttexttexttexttext
-        if aggregated_log_probs:
-            # texttextlogsumexptexttextlogtexttexttexttexttexttext
-            total_log_prob = self.logsumexp(aggregated_log_probs)
-            normalized_log_probs = [lp - total_log_prob for lp in aggregated_log_probs]
-            
-            # texttextRaotexttexttexttexttexttexttext: -sum(exp(log_p) * log_p)
-            entropy = -sum(math.exp(log_p) * log_p for log_p in normalized_log_probs)
-            return entropy
+        # 5. texttextRaotexttexttexttexttext: -sum(exp(log_p) * log_p)
+        entropy = -sum(math.exp(log_p) * log_p for log_p in log_likelihood_per_semantic_id)
         
-        return 0.0
+        # texttexttexttexttexttext
+        logging.debug(f"texttextID: {cluster_ids}")
+        logging.debug(f"texttexttexttexttexttext: {log_probs}")
+        logging.debug(f"texttexttexttexttexttexttexttexttext: {[lp - total_log_prob for _, lp in valid_data]}")
+        logging.debug(f"texttexttexttextIDtexttexttexttexttexttexttext: {log_likelihood_per_semantic_id}")
+        logging.debug(f"texttexttexttexttexttexttexttext: {entropy}")
+        
+        return entropy
     
     def calculate_question_entropy(self, question_data: Dict) -> float:
         """
@@ -321,19 +329,29 @@ class SemanticEntropyCalculator:
                 log_probs.append(logprob)
         
         if not answers or not log_probs:
+            logging.warning(f"texttext '{question_data.get('question', 'texttexttexttext')}' texttexttexttexttexttexttexttexttexttexttexttext")
             return 0.0
         
         # texttexttexttexttexttexttexttexttext
         cluster_ids = self.get_semantic_ids(answers)
         
+        # texttexttexttexttexttext
+        if len(set(cluster_ids)) == 1:
+            logging.warning(f"texttext '{question_data.get('question', 'texttexttexttext')}' texttexttexttexttexttexttexttexttexttexttexttext: {cluster_ids}")
+        
+        # texttexttexttexttexttexttexttexttexttext
+        if len(set(log_probs)) == 1:
+            logging.warning(f"texttext '{question_data.get('question', 'texttexttexttext')}' texttexttexttexttexttexttexttexttexttexttext: {log_probs[0]}")
+        
         # texttexttexttexttexttexttexttextCalculate semantic entropy
         entropy = self.calculate_cluster_entropy(cluster_ids, log_probs)
         
-        # texttexttexttexttexttext
+        # texttexttexttexttexttexttexttexttext
         logging.debug(f"texttext: {question_data.get('question', 'texttexttexttext')}")
         logging.debug(f"texttexttexttext: {len(answers)}")
-        logging.debug(f"texttexttexttext: {cluster_ids}")
+        logging.debug(f"texttexttexttext: {answers}")
         logging.debug(f"texttexttexttext: {log_probs}")
+        logging.debug(f"texttexttexttext: {cluster_ids}")
         logging.debug(f"texttexttexttexttexttexttexttext: {entropy}")
         
         return entropy

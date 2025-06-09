@@ -8,6 +8,7 @@ import wandb
 import numpy as np
 import math
 from typing import List, Dict, Union, Any, Optional
+import traceback
 
 
 def setup_logger(debug=False):
@@ -188,11 +189,20 @@ def wandb_restore(wandb_run, filename):
 
 
 def save_results(results, output_dir, filename='results.pkl'):
-    """texttexttexttexttexttextpickletexttext """
+    """texttexttexttexttexttextpickletexttexttexttexttexttextwandb """
+    # texttexttexttexttext
     output_path = Path(output_dir) / filename
     with open(output_path, 'wb') as f:
         pickle.dump(results, f)
-    logging.info(f"texttexttexttexttexttext{output_path}")
+    logging.info(f"texttexttexttexttexttexttexttext: {output_path}")
+    
+    # texttexttextwandb
+    try:
+        wandb.save(str(output_path))
+        logging.info(f"texttexttexttexttexttextwandb")
+    except Exception as e:
+        logging.error(f"texttexttextwandbtexttexttext: {e}")
+    
     return str(output_path)
 
 
@@ -203,20 +213,17 @@ def load_results(results_path):
         results_path: Pickletexttexttexttexttext
         
     Returns:
-        texttexttexttexttexttexttext
+        texttexttexttexttexttexttext texttexttexttexttexttexttexttexttextNone
     """
-    results_path = Path(results_path)
-    if not results_path.exists():
-        logging.error(f"texttexttexttexttexttexttext: {results_path}")
-        return None
-    
     try:
         with open(results_path, 'rb') as f:
             results = pickle.load(f)
-        logging.info(f"text{results_path}texttexttexttexttexttext")
+        logging.info(f"texttexttext {results_path} texttexttexttext")
         return results
     except Exception as e:
-        logging.error(f"texttexttexttexttexttexttext: {e}")
+        logging.error(f"texttexttexttexttexttext {results_path} texttexttext: {e}")
+        if debug:
+            logging.error(traceback.format_exc())
         return None
 
 

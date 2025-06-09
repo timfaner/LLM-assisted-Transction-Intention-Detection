@@ -123,26 +123,26 @@ Ensure that your analysis is thorough, accurate, and based solely on the provide
             """.strip(),
             
             "generate_questions": """
-Given the following transaction analysis of a smart contract, generate 3 specific questions that an auditor or contract analyst would most likely ask to better understand the contract functionality, potential security implications, or user impact.
+Given the following transaction analysis of a smart contract, generate 3 concise and specific questions that focus on key aspects of the contract's functionality and security.
 
 Transaction Analysis:
 {intent}
 
-Generate 3 specific, non-redundant questions that focus on different aspects of the contract's behavior, risks, or implications. Each question should be detailed enough that it requires in-depth knowledge of the contract to answer.
+Generate exactly 3 short, clear questions that cover different important aspects of the contract. Each question should be direct and to the point.
 
 Format your response as a JSON array of exactly 3 questions:
 ["Question 1", "Question 2", "Question 3"]
             """.strip(),
             
             "generate_questions_for_section": """
-Given the following section from a smart contract transaction analysis, generate 3 specific questions that an auditor or contract analyst would most likely ask about this particular aspect of the transaction.
+Given the following section from a smart contract transaction analysis, generate 3 concise questions about this specific aspect.
 
 Section Type: {section_name}
 
 Section Content:
 {section_content}
 
-Generate 3 specific, non-redundant questions that focus specifically on this {section_name} aspect of the transaction. Each question should be detailed enough that it requires in-depth knowledge to answer.
+Generate exactly 3 short, clear questions that focus on key points of this {section_name}. Each question should be direct and to the point.
 
 Format your response as a JSON array of exactly 3 questions:
 ["Question 1", "Question 2", "Question 3"]

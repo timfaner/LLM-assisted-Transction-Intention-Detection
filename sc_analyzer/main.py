@@ -16,7 +16,8 @@ import torch
 
 from sc_analyzer.models import get_model
 from sc_analyzer.utils import (
-    setup_logger, log_w_indent, md5hash, save_results, read_smart_contract
+    setup_logger, log_w_indent, md5hash, save_results,
+    read_smart_contract, load_results
 )
 
 # Global constants
@@ -131,15 +132,30 @@ def main(args):
         https_proxy=args.https_proxy
     )
     
-    # Scan the input directory for contract folders
-    contracts_path = Path(args.input_dir)
-    contract_folders = [f for f in contracts_path.iterdir() if f.is_dir()]
-    logging.info(f"text{args.input_dir}texttexttext{len(contract_folders)}texttexttexttexttexttext")
+    # Dispatch processing by step argument
+    if args.step == "step1" or args.step == "all":
+        results = step1_generate_intents(args, model, run_dir)
+    elif args.step == "step2":
+        if not args.input_results:
+            logging.error("step2texttexttexttexttexttexttexttexttexttexttexttexttexttext(--input_results)")
+            return 1
+        results = step2_generate_questions(args, model, run_dir)
+    elif args.step == "step3":
+        if not args.input_results:
+            logging.error("step3texttexttexttexttexttexttexttexttexttexttexttexttexttext(--input_results)")
+            return 1
+        results = step3_generate_answers(args, model, run_dir)
     
-    if len(contract_folders) == 0:
-        logging.warning(f"texttext text{args.input_dir}texttexttexttexttexttexttexttexttexttexttext")
+    # Save final results
+    if args.step != "all":
+        results['test_config']['test_end_time'] = datetime.datetime.now().isoformat()
+        save_results(results, wandb.run.dir, RESULTS_FILENAME)
     
-    # Process each contract folder
+    logging.info(f"texttexttext {len(results['contract_intents'])} texttexttexttexttexttext")
+    logging.info(f"texttexttexttexttexttext {wandb.run.dir}/{RESULTS_FILENAME}")
+
+def step1_generate_intents(args, model, run_dir):
+    """texttext1 texttexttexttext"""
     results = {
         'contract_intents': {},
         'prompts': model.get_prompts_for_log(),
@@ -147,124 +163,56 @@ def main(args):
         'test_config': {
             'num_tests': args.num_tests,
             'test_start_time': datetime.datetime.now().isoformat()
+        },
+        'indexes': {
+            'intent_index': {},
+            'section_index': {},
+            'question_index': {},
+            'answer_index': {}
         }
     }
     
-    # texttexttexttexttexttext texttexttexttexttexttexttexttexttexttexttext
-    results['indexes'] = {
-        'intent_index': {},      # intent_id -> texttexttexttexttexttexttexttexttext
-        'section_index': {},     # section_id -> intent_id texttexttexttexttext
-        'question_index': {},    # question_id -> section_id texttexttexttexttext
-        'answer_index': {}       # answer_id -> question_id texttexttexttexttext
-    }
+    # Scan the input directory for contract folders
+    contracts_path = Path(args.input_dir)
+    contract_folders = [f for f in contracts_path.iterdir() if f.is_dir()]
+    logging.info(f"text{args.input_dir}texttexttext{len(contract_folders)}texttexttexttexttexttext")
     
     for idx, contract_folder in enumerate(contract_folders):
         if idx >= args.max_contracts and args.max_contracts > 0:
-            logging.info(f"texttexttexttexttexttexttexttexttexttexttexttexttext({args.max_contracts})")
             break
             
         relative_path = contract_folder.relative_to(contracts_path)
         logging.info(f"texttexttexttexttexttexttexttexttext {idx+1}/{len(contract_folders)}: {relative_path}")
         
         # texttexttexttexttexttexttexttexttexttexttexttexttext
-        contract_file = None
-        transaction_file = None
-        
-        # texttexttexttexttexttexttexttexttexttexttext
-        if args.debug:
-            logging.debug(f"texttexttext {contract_folder} texttext:")
-            for file in contract_folder.iterdir():
-                logging.debug(f"  - {file.name} ({file.suffix})")
-        
-        for file in contract_folder.iterdir():
-            if file.suffix.lower() == '.sol':
-                contract_file = file
-                logging.info(f"texttexttexttexttexttext: {file.name}")
-            elif file.suffix.lower() in ['.json', '.xlsx', '.csv', '.txt']:
-                transaction_file = file
-                logging.info(f"texttexttexttexttexttexttexttext: {file.name}")
-        
+        contract_file, transaction_file = find_contract_files(contract_folder, args.debug)
         if not contract_file:
-            logging.error(f"texttexttexttext {contract_folder} texttexttexttext.soltexttexttexttext")
             continue
             
-        if not transaction_file:
-            logging.warning(f"texttexttexttext {contract_folder} texttexttexttexttexttexttexttexttexttext")
-        
         # texttexttexttexttexttext
         try:
             contract_content = read_smart_contract(contract_file)
-            logging.info(f"texttexttexttext {contract_file.name} texttexttexttext texttext {len(contract_content)}texttext")
+            transaction_data = read_transaction_data(transaction_file) if transaction_file else ""
             
-            # texttexttexttexttexttexttexttexttexttexttexttexttexttexttext
-            if args.debug:
-                content_preview = contract_content[:100] + ("..." if len(contract_content) > 100 else "")
-                logging.debug(f"texttexttexttexttexttext: {content_preview}")
-        except Exception as e:
-            logging.error(f"texttexttexttexttexttext {contract_file} texttexttext: {e}")
-            if args.debug:
-                logging.error(traceback.format_exc())
-            continue
-        
-        # texttexttexttexttexttext
-        transaction_data = ""
-        if transaction_file:
-            try:
-                if transaction_file.suffix.lower() == '.json':
-                    with open(transaction_file, 'r', encoding='utf-8') as f:
-                        transaction_data = json.dumps(json.load(f), indent=2)
-                else:
-                    with open(transaction_file, 'r', encoding='utf-8') as f:
-                        transaction_data = f.read()
-                logging.info(f"texttexttexttexttexttext {transaction_file.name} texttexttexttext texttext {len(transaction_data)}texttext")
-                
-                # texttexttexttexttexttexttexttexttexttexttexttexttexttexttext
-                if args.debug:
-                    data_preview = transaction_data[:100] + ("..." if len(transaction_data) > 100 else "")
-                    logging.debug(f"texttexttexttexttexttext: {data_preview}")
-            except Exception as e:
-                logging.error(f"texttexttexttexttexttext {transaction_file} texttexttext: {e}")
-                if args.debug:
-                    logging.error(traceback.format_exc())
-        
-        # Create a list to store results for each contract
-        contract_results = []
-        
-        # Perform n tests for each contract
-        for test_idx in range(args.num_tests):
-            logging.info(f"texttexttexttexttexttext {test_idx+1}/{args.num_tests}")
-            
-            # Generate intent using LLM
-            try:
-                logging.info(f"texttexttexttexttexttexttexttexttexttext...")
+            # texttexttexttext
+            contract_results = []
+            for test_idx in range(args.num_tests):
                 intent_result = model.generate_intent(contract_content, transaction_data)
                 
-                # texttexttexttexttexttext
                 if isinstance(intent_result, tuple) and len(intent_result) >= 3:
                     intent, token_log_likelihoods, embedding = intent_result
                 else:
-                    # texttexttexttexttexttexttexttexttext
                     intent = intent_result
                     token_log_likelihoods = []
                     embedding = None
                 
-                logging.info(f"texttext {relative_path} texttexttext {test_idx+1} texttexttext texttext: {len(intent)}texttext")
-                log_w_indent(f"texttext {test_idx+1} text100texttexttext: {intent[:100]}...", indent=1)
-                
-                # texttexttexttexttexttexttexttexttext
-                parsed_sections = parse_intent_sections(intent)
-                logging.info(f"texttexttexttexttexttext {len(parsed_sections)} texttexttext")
-                
-                # texttexttexttexttexttexttexttexttexttext
                 intent_id = generate_unique_id(prefix=f"intent_{contract_file.stem}_{test_idx}_")
                 
-                # texttexttexttext
                 results['indexes']['intent_index'][intent_id] = {
                     'contract_path': str(relative_path),
                     'test_idx': test_idx
                 }
                 
-                # texttexttexttexttexttexttexttext texttexttexttexttexttexttexttexttexttexttexttexttexttexttext
                 intent_data = {
                     'intent_id': intent_id,
                     'test_id': test_idx,
@@ -274,107 +222,9 @@ def main(args):
                     'intent': intent,
                     'intent_length': len(intent),
                     'token_log_likelihoods': token_log_likelihoods,
-                    'embedding': embedding,
-                    'sections': []  # texttexttexttexttexttexttexttext
+                    'embedding': embedding
                 }
                 
-                # texttexttexttexttexttext
-                total_questions = 0
-                total_answers = 0
-                
-                for section_name in INTENT_SECTIONS:
-                    section_content = parsed_sections.get(section_name, "")
-                    if not section_content:
-                        logging.warning(f"texttexttext {section_name} texttexttexttext")
-                        continue
-                    
-                    section_id = generate_unique_id(prefix=f"{intent_id}_{section_name}_")
-                    
-                    # texttexttexttext
-                    results['indexes']['section_index'][section_id] = {
-                        'intent_id': intent_id,
-                        'section_name': section_name
-                    }
-                    
-                    logging.info(f"texttexttext {section_name} texttexttexttexttexttext...")
-                    
-                    # texttexttexttexttexttexttexttext
-                    section_questions = model.generate_questions_for_section(section_content, section_name)
-                    logging.info(f"text {section_name} texttexttexttexttexttext {len(section_questions)} texttexttext")
-                    
-                    # texttexttexttext
-                    for q_idx, question in enumerate(section_questions):
-                        log_w_indent(f"{section_name} texttext {q_idx+1}: {question[:100]}...", indent=2)
-                    
-                    section_data = {
-                        'section_id': section_id,
-                        'intent_id': intent_id,
-                        'section_name': section_name,
-                        'content': section_content,
-                        'questions': []
-                    }
-                    
-                    # texttexttexttexttexttexttexttexttext
-                    questions_list = []
-                    
-                    for q_idx, question in enumerate(section_questions):
-                        question_id = generate_unique_id(prefix=f"{section_id}_q{q_idx}_")
-                        
-                        # texttexttexttext
-                        results['indexes']['question_index'][question_id] = {
-                            'section_id': section_id,
-                            'question_idx': q_idx
-                        }
-                        
-                        logging.info(f"texttexttext {section_name} texttexttexttexttext {q_idx+1} texttexttexttext...")
-                        
-                        # texttexttexttext
-                        answers = model.generate_answers(question, section_content)
-                        total_answers += len(answers)
-                        
-                        # texttexttexttexttextlogprobtexttexttexttexttexttext
-                        log_likelihoods = [a['avg_logprob'] for a in answers if a['avg_logprob'] is not None]
-                        
-                        question_data = {
-                            'question_id': question_id,
-                            'section_id': section_id,
-                            'intent_id': intent_id,
-                            'question_idx': q_idx,
-                            'question': question,
-                            'answers': [],
-                            'log_likelihoods': log_likelihoods
-                        }
-                        
-                        # texttexttexttext
-                        for a_idx, answer_data in enumerate(answers):
-                            answer_id = generate_unique_id(prefix=f"{question_id}_a{a_idx}_")
-                            
-                            # texttexttexttext
-                            results['indexes']['answer_index'][answer_id] = {
-                                'question_id': question_id,
-                                'answer_idx': a_idx
-                            }
-                            
-                            answer_entry = {
-                                'answer_id': answer_id,
-                                'question_id': question_id,
-                                'section_id': section_id,
-                                'intent_id': intent_id,
-                                'answer_idx': a_idx,
-                                'answer': answer_data['answer'],
-                                'avg_logprob': answer_data['avg_logprob'],
-                                'logprobs': answer_data['logprobs']
-                            }
-                            
-                            question_data['answers'].append(answer_entry)
-                        
-                        questions_list.append(question_data)
-                    
-                    section_data['questions'] = questions_list
-                    total_questions += len(questions_list)
-                    intent_data['sections'].append(section_data)
-                
-                # texttexttexttexttexttexttexttexttext
                 contract_results.append(intent_data)
                 
                 # Log to wandb
@@ -385,10 +235,7 @@ def main(args):
                     'latest_intent_length': len(intent),
                     'token_log_likelihood_available': len(token_log_likelihoods) > 0,
                     'avg_token_log_likelihood': sum(token_log_likelihoods) / len(token_log_likelihoods) if token_log_likelihoods else None,
-                    'embedding_available': embedding is not None,
-                    'num_sections_processed': len(intent_data['sections']),
-                    'num_questions_generated': total_questions,
-                    'num_answers_generated': total_answers
+                    'embedding_available': embedding is not None
                 }
                 
                 if embedding is not None:
@@ -396,13 +243,12 @@ def main(args):
                 
                 wandb.log(log_data)
                 
-            except Exception as e:
-                logging.error(f"texttexttext {contract_folder} texttexttext {test_idx+1} texttexttexttexttexttext: {e}")
-                if args.debug:
-                    logging.error(traceback.format_exc())
-                continue
+        except Exception as e:
+            logging.error(f"texttexttexttext {contract_folder} texttexttext: {e}")
+            if args.debug:
+                logging.error(traceback.format_exc())
+            continue
         
-        # Save all test results for the contract
         results['contract_intents'][str(relative_path)] = {
             'folder_path': str(contract_folder),
             'relative_path': str(relative_path),
@@ -412,38 +258,153 @@ def main(args):
             'content_hash': md5hash(contract_content),
             'test_results': contract_results
         }
-            
-        # Save intermediate results
+        
         if args.save_interval > 0 and (idx + 1) % args.save_interval == 0:
-            results['test_config']['last_processed'] = str(contract_folder)
             save_results(results, wandb.run.dir, RESULTS_FILENAME)
-            logging.info(f"texttexttexttexttexttexttext texttexttext {idx}/{len(contract_folders)} texttexttexttexttexttext")
     
-    # Save final results
-    results['test_config']['test_end_time'] = datetime.datetime.now().isoformat()
-    # texttexttextwandb
-    save_results(results, wandb.run.dir, RESULTS_FILENAME)
-    # texttexttexttexttexttexttexttexttexttexttext
-    save_direct_results(results, run_dir)
+    return results
+
+def step2_generate_questions(args, model, run_dir):
+    """texttext2 texttexttexttext"""
+    # texttexttexttexttexttexttexttext
+    results = load_results(args.input_results)
+    if not results:
+        raise ValueError("texttexttexttexttexttexttexttexttexttexttexttext")
     
-    logging.info(f"texttexttext {len(results['contract_intents'])} texttexttexttexttexttext")
-    logging.info(f"texttexttexttexttexttext {wandb.run.dir}/{RESULTS_FILENAME} text {run_dir}/files/{RESULTS_FILENAME}")
+    for contract_path, contract_data in results['contract_intents'].items():
+        for intent_data in contract_data['test_results']:
+            intent = intent_data['intent']
+            intent_id = intent_data['intent_id']
+            
+            # texttexttexttexttexttexttexttexttext
+            parsed_sections = parse_intent_sections(intent)
+            
+            # texttexttexttexttexttexttexttexttext
+            for section_name in INTENT_SECTIONS:
+                section_content = parsed_sections.get(section_name, "")
+                if not section_content:
+                    continue
+                
+                section_id = generate_unique_id(prefix=f"{intent_id}_{section_name}_")
+                
+                results['indexes']['section_index'][section_id] = {
+                    'intent_id': intent_id,
+                    'section_name': section_name
+                }
+                
+                # texttexttexttext
+                section_questions = model.generate_questions_for_section(section_content, section_name)
+                
+                # texttexttexttext
+                for q_idx, question in enumerate(section_questions):
+                    question_id = generate_unique_id(prefix=f"{section_id}_q{q_idx}_")
+                    
+                    results['indexes']['question_index'][question_id] = {
+                        'section_id': section_id,
+                        'question_idx': q_idx
+                    }
+                    
+                    if 'sections' not in intent_data:
+                        intent_data['sections'] = []
+                    
+                    section_data = {
+                        'section_id': section_id,
+                        'intent_id': intent_id,
+                        'section_name': section_name,
+                        'content': section_content,
+                        'questions': [{
+                            'question_id': question_id,
+                            'section_id': section_id,
+                            'intent_id': intent_id,
+                            'question_idx': q_idx,
+                            'question': question
+                        }]
+                    }
+                    
+                    intent_data['sections'].append(section_data)
+    
+    return results
 
-def save_results(results, output_dir, filename):
-    """texttexttexttexttexttextpickletexttext """
-    output_path = os.path.join(output_dir, filename)
-    with open(output_path, 'wb') as f:
-        pickle.dump(results, f)
-    logging.info(f"texttexttexttexttexttext {output_path}")
-    wandb.save(filename)
+def step3_generate_answers(args, model, run_dir):
+    """texttext3 texttexttexttext"""
+    # texttexttexttexttexttexttexttext
+    results = load_results(args.input_results)
+    if not results:
+        raise ValueError("texttexttexttexttexttexttexttexttexttexttexttext")
+    
+    for contract_path, contract_data in results['contract_intents'].items():
+        for intent_data in contract_data['test_results']:
+            if 'sections' not in intent_data:
+                continue
+                
+            for section_data in intent_data['sections']:
+                for question_data in section_data['questions']:
+                    question = question_data['question']
+                    question_id = question_data['question_id']
+                    
+                    # texttexttexttext
+                    answers = model.generate_answers(question, section_data['content'])
+                    
+                    # texttexttexttext
+                    question_data['answers'] = []
+                    for a_idx, answer_data in enumerate(answers):
+                        answer_id = generate_unique_id(prefix=f"{question_id}_a{a_idx}_")
+                        
+                        results['indexes']['answer_index'][answer_id] = {
+                            'question_id': question_id,
+                            'answer_idx': a_idx
+                        }
+                        
+                        answer_entry = {
+                            'answer_id': answer_id,
+                            'question_id': question_id,
+                            'section_id': section_data['section_id'],
+                            'intent_id': intent_data['intent_id'],
+                            'answer_idx': a_idx,
+                            'answer': answer_data['answer'],
+                            'avg_logprob': answer_data['avg_logprob'],
+                            'logprobs': answer_data['logprobs']
+                        }
+                        
+                        question_data['answers'].append(answer_entry)
+    
+    return results
 
-def save_direct_results(results, run_dir):
-    """texttexttexttexttexttexttexttexttexttexttexttext texttexttextwandb """
-    output_path = run_dir / "files" / RESULTS_FILENAME
-    with open(output_path, 'wb') as f:
-        pickle.dump(results, f)
-    logging.info(f"texttexttexttexttexttexttexttext {output_path}")
-    return str(output_path)
+def find_contract_files(contract_folder, debug=False):
+    """texttexttexttexttexttexttexttexttexttexttexttexttext"""
+    contract_file = None
+    transaction_file = None
+    
+    if debug:
+        logging.debug(f"texttexttext {contract_folder} texttext:")
+        for file in contract_folder.iterdir():
+            logging.debug(f"  - {file.name} ({file.suffix})")
+    
+    for file in contract_folder.iterdir():
+        if file.suffix.lower() == '.sol':
+            contract_file = file
+            logging.info(f"texttexttexttexttexttext: {file.name}")
+        elif file.suffix.lower() in ['.json', '.xlsx', '.csv', '.txt']:
+            transaction_file = file
+            logging.info(f"texttexttexttexttexttexttexttext: {file.name}")
+    
+    if not contract_file:
+        logging.error(f"texttexttexttext {contract_folder} texttexttexttext.soltexttexttexttext")
+    
+    return contract_file, transaction_file
+
+def read_transaction_data(transaction_file):
+    """texttexttexttexttexttexttexttext"""
+    try:
+        if transaction_file.suffix.lower() == '.json':
+            with open(transaction_file, 'r', encoding='utf-8') as f:
+                return json.dumps(json.load(f), indent=2)
+        else:
+            with open(transaction_file, 'r', encoding='utf-8') as f:
+                return f.read()
+    except Exception as e:
+        logging.error(f"texttexttexttexttexttext {transaction_file} texttexttext: {e}")
+        return ""
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="texttexttexttexttexttexttexttexttext")
@@ -459,6 +420,12 @@ if __name__ == "__main__":
                         help="texttexttexttexttexttexttexttexttexttexttexttexttext 0texttexttexttext ")
     parser.add_argument("--num_tests", type=int, default=6,
                         help="texttexttexttexttexttexttexttexttexttexttext")
+    
+    # Step execution options
+    parser.add_argument("--step", type=str, choices=["step1", "step2", "step3", "all"], default="all",
+                        help="texttexttexttext step1(texttexttexttext), step2(texttexttexttext), step3(texttexttexttext), all(texttexttexttext)")
+    parser.add_argument("--input_results", type=str, default=None,
+                        help="texttexttexttexttexttexttexttexttexttexttext texttextstep2textstep3 ")
     
     # Model options
     parser.add_argument("--model_type", type=str, default="api",

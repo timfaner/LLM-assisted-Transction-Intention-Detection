@@ -189,19 +189,56 @@ def wandb_restore(wandb_run, filename):
 
 
 def save_results(results, output_dir, filename='results.pkl'):
-    """texttexttexttexttexttextpickletexttexttexttexttexttextwandb """
-    # texttexttexttexttext
-    output_path = Path(output_dir) / filename
-    with open(output_path, 'wb') as f:
-        pickle.dump(results, f)
-    logging.info(f"texttexttexttexttexttexttexttext: {output_path}")
+    """texttexttexttexttexttextpickletexttexttexttexttexttextwandb 
+    
+    Args:
+        results: texttexttexttexttexttexttexttext
+        output_dir: texttexttexttext
+        filename: texttexttexttexttext
+        
+    Returns:
+        texttexttexttexttexttexttext
+    """
+    # texttexttexttexttexttexttexttext
+    output_dir = Path(output_dir)
+    output_dir.mkdir(parents=True, exist_ok=True)
+    
+    # texttexttexttexttexttexttexttexttext
+    output_path = output_dir / filename
+    
+    # texttexttexttexttexttexttext
+    try:
+        with open(output_path, 'wb') as f:
+            pickle.dump(results, f)
+        logging.info(f"texttexttexttexttexttexttexttext: {output_path}")
+    except Exception as e:
+        logging.error(f"texttexttexttexttexttexttexttexttexttexttexttext: {e}")
+        if debug:
+            logging.error(traceback.format_exc())
+        return None
     
     # texttexttextwandb
     try:
-        wandb.save(str(output_path))
+        # texttextbase_pathtexttexttexttexttexttexttexttexttexttext
+        wandb.save(str(output_path), base_path=str(output_dir))
         logging.info(f"texttexttexttexttexttextwandb")
     except Exception as e:
         logging.error(f"texttexttextwandbtexttexttext: {e}")
+        if debug:
+            logging.error(traceback.format_exc())
+    
+    # texttexttexttexttextfiles/texttexttext
+    try:
+        files_dir = output_dir.parent / "files"
+        files_dir.mkdir(parents=True, exist_ok=True)
+        files_path = files_dir / filename
+        with open(files_path, 'wb') as f:
+            pickle.dump(results, f)
+        logging.info(f"texttexttexttexttexttextfilestexttexttext: {files_path}")
+    except Exception as e:
+        logging.error(f"texttexttexttexttextfilestexttexttexttexttexttext: {e}")
+        if debug:
+            logging.error(traceback.format_exc())
     
     return str(output_path)
 

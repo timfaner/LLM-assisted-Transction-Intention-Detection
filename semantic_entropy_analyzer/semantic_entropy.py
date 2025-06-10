@@ -236,24 +236,6 @@ class SemanticEntropyCalculator:
         entropy = -sum(p * math.log2(p) for p in normalized_probs if p > 0)
         return entropy
     
-    def logsumexp(self, log_probs: List[float]) -> float:
-        """
-        texttextlog(sum(exp(x))) texttexttexttexttexttexttexttext 
-        
-        texttext:
-            log_probs: texttexttexttexttexttext
-            
-        texttext:
-            log(sum(exp(x)))texttext
-        """
-        if not log_probs:
-            return float('-inf')
-            
-        max_log_prob = max(log_probs)
-        sum_exp = sum(math.exp(lp - max_log_prob) for lp in log_probs)
-        
-        return max_log_prob + math.log(sum_exp)
-    
     def calculate_cluster_entropy(self, cluster_ids: List[int], log_probs: List[float]) -> float:
         """
         texttexttexttextIDtexttexttexttexttextCalculate semantic entropy texttextRaotexttext  
@@ -275,32 +257,45 @@ class SemanticEntropyCalculator:
         if not valid_data:
             return 0.0
             
-        # 1. texttexttexttexttexttexttexttexttext
+        # texttexttexttexttexttexttextIDtexttexttexttexttext
+        valid_cluster_ids = [cid for cid, _ in valid_data]
         valid_log_probs = [lp for _, lp in valid_data]
         
-        # 2. texttexttexttexttexttexttext texttexttexttexttexttexttextlogsumexp 
-        total_log_prob = self.logsumexp(valid_log_probs)
+        # texttexttexttexttexttexttextIDtexttexttexttexttexttext
+        unique_ids = sorted(list(set(valid_cluster_ids)))
+        if unique_ids != list(range(len(unique_ids))):
+            logging.warning("texttextIDtexttexttext texttexttexttexttext")
+            # texttexttexttexttexttextIDtexttexttexttexttexttext
+            id_mapping = {old_id: new_id for new_id, old_id in enumerate(unique_ids)}
+            valid_cluster_ids = [id_mapping[cid] for cid in valid_cluster_ids]
+            unique_ids = list(range(len(unique_ids)))
         
-        # 3. texttexttextIDtexttext texttexttexttexttexttexttexttexttexttexttexttext
-        cluster_log_probs = defaultdict(list)
-        for cluster_id, log_prob in valid_data:
-            # texttexttexttexttexttext texttexttext
-            normalized_log_prob = log_prob - total_log_prob
-            cluster_log_probs[cluster_id].append(normalized_log_prob)
-        
-        # 4. texttexttexttexttexttexttexttexttexttexttexttexttexttexttexttexttextlogsumexptexttext
+        # texttexttexttexttexttextIDtextlogsumexp
         log_likelihood_per_semantic_id = []
-        for log_probs_list in cluster_log_probs.values():
-            if log_probs_list:
-                log_likelihood_per_semantic_id.append(self.logsumexp(log_probs_list))
+        for uid in unique_ids:
+            # texttexttexttexttexttextuidtexttexttexttexttext
+            id_indices = [pos for pos, x in enumerate(valid_cluster_ids) if x == uid]
+            # texttexttexttexttexttexttexttexttexttexttext
+            id_log_likelihoods = [valid_log_probs[i] for i in id_indices]
+            
+            # texttexttexttexttexttexttext
+            total_log_prob = math.log(sum(math.exp(lp) for lp in valid_log_probs))
+            
+            # texttexttexttexttexttexttext
+            log_lik_norm = [lp - total_log_prob for lp in id_log_likelihoods]
+            
+            # texttextlogsumexp
+            logsumexp_value = math.log(sum(math.exp(lp) for lp in log_lik_norm))
+            
+            log_likelihood_per_semantic_id.append(logsumexp_value)
         
-        # 5. texttextRaotexttexttexttexttext: -sum(exp(log_p) * log_p)
+        # texttextRaotexttexttexttexttext
         entropy = -sum(math.exp(log_p) * log_p for log_p in log_likelihood_per_semantic_id)
         
         # texttexttexttexttexttext
-        logging.debug(f"texttextID: {cluster_ids}")
-        logging.debug(f"texttexttexttexttexttext: {log_probs}")
-        logging.debug(f"texttexttexttexttexttexttexttexttext: {[lp - total_log_prob for _, lp in valid_data]}")
+        logging.debug(f"texttextID: {valid_cluster_ids}")
+        logging.debug(f"texttexttexttexttexttext: {valid_log_probs}")
+        logging.debug(f"texttexttexttexttexttexttexttexttext: {[lp - total_log_prob for lp in valid_log_probs]}")
         logging.debug(f"texttexttexttextIDtexttexttexttexttexttexttext: {log_likelihood_per_semantic_id}")
         logging.debug(f"texttexttexttexttexttexttexttext: {entropy}")
         

@@ -41,6 +41,8 @@ def parse_args():
                         help="texttexttexttext cudatextcpu ")
     parser.add_argument("--no_api", action="store_true",
                         help="texttexttextAPItexttexttexttexttexttexttexttext texttexttexttextAPI ")
+    parser.add_argument("--mode", type=str, choices=["step3", "all"], default="step3",
+                        help="texttexttexttext step3textall")
     
     # Analysis parameters
     parser.add_argument("--skip_analysis", action="store_true",
@@ -86,51 +88,37 @@ def main():
         
         logger.info(f"texttexttexttext {results_path} texttexttexttext")
         logger.info(f"texttextAPItexttexttexttexttexttexttexttext: {not args.no_api}")
+        logger.info(f"texttexttexttext: {args.mode}")
         
         # Calculate entropies
         calculator = SemanticEntropyCalculator(
             results_path=str(results_path),
             output_dir=str(output_dir),
             device=args.device,
-            use_api_for_equivalence=not args.no_api
+            use_api_for_equivalence=not args.no_api,
+            mode=args.mode
         )
         
         entropy_results = calculator.calculate_entropies()
         
         # texttexttexttexttexttext
         logger.info("==== Semantic Entropy Calculation Results Summary ====")
-        logger.info(f"Number of Contracts Analyzed: {entropy_results['summary']['num_contracts']}")
-        logger.info(f"Overall Average Semantic Entropy: {entropy_results['summary']['avg_overall_entropy']:.4f}")
+        logger.info(f"Mode: {entropy_results['summary']['mode']}")
+        logger.info(f"Overall Average Semantic Entropy: {entropy_results['overall_entropy']:.4f}")
         logger.info(f"Calculation Time: {entropy_results['summary']['time_taken']:.2f} seconds")
         
-        if not args.skip_analysis and 'contracts' in entropy_results and entropy_results['contracts']:
+        if not args.skip_analysis and 'questions' in entropy_results and entropy_results['questions']:
             # Run analysis
             logger.info("==== Starting Semantic Entropy Analysis ====")
             
             # texttexttexttexttexttexttexttext
-            for contract in entropy_results['contracts']:
-                contract_path = contract['contract_path']
-                avg_entropy = contract['avg_overall_entropy']
-                logger.info(f"Contract {contract_path}: Average Semantic Entropy = {avg_entropy:.4f}")
-                
-                # texttexttexttexttexttexttexttext
-                if args.save_detailed:
-                    for intent in contract['intent_entropies']:
-                        intent_id = intent['intent_id']
-                        intent_entropy = intent['overall_entropy']
-                        logger.info(f"  Intent {intent_id}: Semantic Entropy = {intent_entropy:.4f}")
-                        
-                        # texttexttexttexttexttexttexttext
-                        for section_name, section_entropy in intent['section_entropies'].items():
-                            # texttexttexttexttexttext
-                            section_translation = {
-                                'contract_interaction': 'Contract Interaction',
-                                'state_changes': 'State Changes',
-                                'events': 'Events',
-                                'implications': 'Implications'
-                            }
-                            english_section = section_translation.get(section_name, section_name)
-                            logger.info(f"    {english_section}: {section_entropy:.4f}")
+            for question in entropy_results['questions']:
+                question_text = question['question']
+                entropy = question['entropy']
+                num_clusters = question['num_clusters']
+                logger.info(f"Question: {question_text}")
+                logger.info(f"  Entropy: {entropy:.4f}")
+                logger.info(f"  Clusters: {num_clusters}")
             
             # texttexttexttexttexttext
             analyzer = ResultsAnalyzer(

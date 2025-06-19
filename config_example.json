@@ -1,0 +1,11 @@
+{
+    "input_dir": "contracts_to_analyze",
+    "model_type": "api",
+    "model_name": "gpt-4o-mini",
+    "model_provider": "openai",
+    "max_contracts": 20,
+    "save_interval": 5,
+    "num_tests": 3,
+    "log_level": "INFO",
+    "http_proxy": "http://127.0.0.1:7890"
+} 

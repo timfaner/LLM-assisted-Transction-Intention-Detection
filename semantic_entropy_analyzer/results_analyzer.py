@@ -11,13 +11,15 @@ import matplotlib.pyplot as plt
 from matplotlib.figure import Figure
 from collections import defaultdict
 
+from sc_analyzer.data_types import EntropyResults
+
 
 class ResultsAnalyzer:
     """texttexttexttexttexttexttext """
     
     def __init__(
         self, 
-        entropy_results: Dict,  # texttexttexttexttexttexttexttexttexttexttext
+        entropy_results: EntropyResults,  # texttexttexttexttexttexttexttexttexttexttext
         output_dir: Optional[str] = None
     ):
         """

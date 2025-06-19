@@ -1,148 +1,108 @@
 #!/usr/bin/env python3
-"""Runner script for semantic entropy analysis."""
+"""Semantic entropy runner module."""
 
 import os
-import argparse
 import logging
+import argparse
 from pathlib import Path
-import sys
+from typing import Optional, Dict, Any
 
-# texttexttexttext
-try:
-    from sc_analyzer.utils import setup_logger
-except ImportError:
-    # texttexttexttexttexttext texttexttexttexttexttexttextsetup_loggertexttext
-    def setup_logger(level=logging.INFO):
-        """Set up loggingtexttext"""
-        logging.basicConfig(
-            level=level,
-            format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-        )
-        return logging.getLogger(__name__)
-
+from sc_analyzer.utils import setup_logger, load_results
+from sc_analyzer.data_types import AnalysisResults, EntropyResults
 from semantic_entropy_analyzer.semantic_entropy import SemanticEntropyCalculator
 from semantic_entropy_analyzer.results_analyzer import ResultsAnalyzer
 
 
-def parse_args():
-    """Parse command line arguments."""
-    parser = argparse.ArgumentParser(description="texttexttexttexttexttexttexttexttexttexttexttexttexttexttext")
+def setup_argparse():
+    """texttexttexttexttexttexttexttexttext """
+    parser = argparse.ArgumentParser(description="Semantic entropy analysis tool")
     
-    # Required parameters
-    parser.add_argument("--results_path", type=str, required=True, 
-                        help="texttexttexttexttexttexttexttexttexttext")
+    parser.add_argument(
+        "--results_path", "-r", type=str,
+        help="Path to the intention analysis pickle result file"
+    )
     
-    # Output parameters
-    parser.add_argument("--output_dir", type=str, default=None,
-                        help="texttexttexttexttexttexttexttexttexttext")
+    parser.add_argument(
+        "--output_dir", "-o", type=str, default=None,
+        help="Output directory (default: ./entropy_results)"
+    )
     
-    # Entropy calculation parameters
-    parser.add_argument("--device", type=str, default=None,
-                        help="texttexttexttext cudatextcpu ")
-    parser.add_argument("--no_api", action="store_true",
-                        help="texttexttextAPItexttexttexttexttexttexttexttext texttexttexttextAPI ")
-    parser.add_argument("--mode", type=str, choices=["step3", "all"], default="step3",
-                        help="texttexttexttext step3textall")
+
     
-    # Analysis parameters
-    parser.add_argument("--skip_analysis", action="store_true",
-                        help="texttexttexttexttexttext")
-    parser.add_argument("--save_detailed", action="store_true",
-                        help="texttexttexttexttexttexttexttexttexttext")
-    parser.add_argument("--debug", action="store_true",
-                        help="texttexttexttexttexttexttexttext texttexttexttexttexttexttexttexttext")
+    parser.add_argument(
+        "--model_name", type=str, default="all-MiniLM-L6-v2",
+        help="Embedding model name (default: all-MiniLM-L6-v2)"
+    )
     
-    # Logging parameters
-    parser.add_argument("--log_level", type=str, default="INFO",
-                        choices=["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"],
-                        help="texttexttexttext")
+
+    
+    parser.add_argument(
+        "--log_level", "-l", type=str, default="INFO",
+        choices=["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"],
+        help="Log level (default: INFO)"
+    )
     
     return parser.parse_args()
 
 
+def run_entropy_analysis(args) -> Optional[EntropyResults]:
+    """texttexttexttexttexttexttext """
+    logging.info("Starting semantic entropy analysis...")
+    
+    # texttexttexttexttexttext
+    if not args.results_path:
+        logging.error("A result file path is required")
+        return None
+    
+    results: Optional[AnalysisResults] = load_results(args.results_path)
+    if not results:
+        logging.error(f"Unable to load result file: {args.results_path}")
+        return None
+    
+    # Create semantic entropy calculator
+    calculator = SemanticEntropyCalculator(
+        results=results,
+        model_name=args.model_name,
+        mode=args.mode,
+        cluster_threshold=args.cluster_threshold,
+        debug=args.debug,
+        output_dir=args.output_dir
+    )
+    
+    # Calculate semantic entropy
+    entropy_results: EntropyResults = calculator.calculate_entropies()
+    logging.info(f"Semantic entropy calculation complete; overall entropy: {entropy_results['overall_entropy']:.4f}")
+    
+    # texttexttexttext
+    analyzer = ResultsAnalyzer(
+        entropy_results=entropy_results,
+        output_dir=args.output_dir
+    )
+    analysis_results = analyzer.run_analysis()
+    
+    logging.info("Analysis complete")
+    return entropy_results
+
+
 def main():
     """Main function."""
-    args = parse_args()
+    # Parse command-line arguments
+    args = setup_argparse()
     
     # Set up logging
-    log_level = getattr(logging, args.log_level.upper())
-    logging.basicConfig(
-        level=log_level if not args.debug else logging.DEBUG,
-        format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-    )
-    logger = logging.getLogger(__name__)
+    setup_logger(args.log_level)
     
-    try:
-        # Ensure results path exists
-        results_path = Path(args.results_path)
-        if not results_path.exists():
-            logger.error(f"texttexttexttexttexttexttext: {results_path}")
-            return 1
-        
-        # Set up output directory
-        if args.output_dir:
-            output_dir = Path(args.output_dir)
-        else:
-            output_dir = results_path.parent / "entropy_results"
-        output_dir.mkdir(exist_ok=True, parents=True)
-        
-        logger.info(f"texttexttexttext {results_path} texttexttexttext")
-        logger.info(f"texttextAPItexttexttexttexttexttexttexttext: {not args.no_api}")
-        logger.info(f"texttexttexttext: {args.mode}")
-        
-        # Calculate entropies
-        calculator = SemanticEntropyCalculator(
-            results_path=str(results_path),
-            output_dir=str(output_dir),
-            device=args.device,
-            use_api_for_equivalence=not args.no_api,
-            mode=args.mode
-        )
-        
-        entropy_results = calculator.calculate_entropies()
-        
-        # texttexttexttexttexttext
-        logger.info("==== Semantic Entropy Calculation Results Summary ====")
-        logger.info(f"Mode: {entropy_results['summary']['mode']}")
-        logger.info(f"Overall Average Semantic Entropy: {entropy_results['overall_entropy']:.4f}")
-        logger.info(f"Calculation Time: {entropy_results['summary']['time_taken']:.2f} seconds")
-        
-        if not args.skip_analysis and 'questions' in entropy_results and entropy_results['questions']:
-            # Run analysis
-            logger.info("==== Starting Semantic Entropy Analysis ====")
-            
-            # texttexttexttexttexttexttexttext
-            for question in entropy_results['questions']:
-                question_text = question['question']
-                entropy = question['entropy']
-                num_clusters = question['num_clusters']
-                logger.info(f"Question: {question_text}")
-                logger.info(f"  Entropy: {entropy:.4f}")
-                logger.info(f"  Clusters: {num_clusters}")
-            
-            # texttexttexttexttexttext
-            analyzer = ResultsAnalyzer(
-                entropy_results=entropy_results,
-                output_dir=output_dir / "analysis"
-            )
-            
-            analysis_results = analyzer.run_analysis()
-            
-            logger.info(f"Analysis results saved to {output_dir / 'analysis'}")
-        
-        logger.info("Semantic entropy analysis completed!")
-        logger.info(f"Results saved to {output_dir}")
-        
-        return 0
+    # Run analysis
+    entropy_results = run_entropy_analysis(args)
     
-    except KeyboardInterrupt:
-        logger.info("texttexttexttexttexttext")
-        return 130
-    
-    except Exception as e:
-        logger.exception(f"texttexttexttexttexttexttext: {e}")
+    if entropy_results:
+        logging.info("Semantic entropy analysis completed successfully")
+    else:
+        logging.error("Semantic entropy analysis failed")
         return 1
+    
+    return 0
 
 
 if __name__ == "__main__":
-    sys.exit(main())
+    exit(main())

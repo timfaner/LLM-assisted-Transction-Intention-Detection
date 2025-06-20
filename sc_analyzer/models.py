@@ -653,7 +653,7 @@ class LegacyAPIModel(BaseModel):
             ]
 
 
-## todo texttext openai, deepseek, claude
+## TODO texttext openai, deepseek, claude
 class APIModel():
     """Model using LLM API."""
     

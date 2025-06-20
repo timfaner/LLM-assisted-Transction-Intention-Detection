@@ -65,7 +65,7 @@ class SemanticEntropyCalculator:
         self.logger = logging.getLogger("SE-cal")
         self.logger.setLevel(logging.DEBUG)
 
-    # todo texttexttexttexttextentailment
+
     def are_equivalent_llm_api(self, context: str,text1: str, text2: str) -> bool:
         """
         texttextLLM APItexttexttexttexttexttexttexttexttexttexttexttext 
@@ -87,7 +87,7 @@ class SemanticEntropyCalculator:
         self.logger.debug(f"texttexttexttexttexttexttexttext: {result}")
 
 
-        ## todo texttexttexttexttext neutral texttexttext
+        ## FIXME texttexttexttexttext neutral texttexttext
         if 'entailment' in result:
             return True
         elif 'contradiction' in result:

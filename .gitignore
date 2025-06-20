@@ -19,3 +19,5 @@ dist/
 .venv/pyvenv.cfg
 
 intent_results/
+
+api_keys.json

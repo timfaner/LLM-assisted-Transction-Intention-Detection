@@ -77,7 +77,7 @@ def main():
 
     question = "Who is tim keith ferguson?"
 
-    ## todo Study the effect of the system prompt on answers
+    ## TODO Study the effect of the system prompt on answers
 
     system_prompt = prompt_config.get_system_prompt("generate_answers")
     answers = model.get_multiple_answers(
